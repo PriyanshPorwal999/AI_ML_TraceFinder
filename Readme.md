@@ -1,4 +1,105 @@
-#  AI TraceFinder — Forensic Scanner Identification  
+# 📊 AI TraceFinder: Forensic Scanner Identification
+
+Detecting document forgery by analyzing a scanner's unique digital fingerprint.
+
+---
+
+## 📘 Table of Contents
+- [About the Project](#-about-the-project)
+- [Tech Stack](#-tech-stack)
+- [Features](#-features)
+- [Demo / Screenshots](#-demo--screenshots)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Contact](#-contact)
+
+---
+
+## 🎯 About the Project
+
+Scanned documents like legal agreements, official certificates, and financial records are easy to forge. It's often impossible to tell if a scanned document is legitimate or if it was created using an unauthorized, fraudulent device.
+
+**AI TraceFinder** solves this problem by identifying the source scanner used to create a digital image.
+
+Every scanner, due to its unique hardware, introduces microscopic and invisible *“fingerprints”* into an image. These include specific noise patterns, texture artifacts, and compression traces. This project uses machine learning to train models that recognize these unique signatures, allowing you to:
+
+- Attribute a scanned document to a specific scanner model.  
+- Detect forgeries where unauthorized scanners were used.  
+- Verify the authenticity of scanned evidence in a forensic context.
+
+> 🖼️ *(Your screenshot of the main app prediction interface would look great here!)*
+
+---
+
+## 🛠 Tech Stack
+
+This project leverages a modern stack for machine learning, image processing, and web application delivery.
+
+| Category | Technology | Purpose |
+|-----------|-------------|----------|
+| **Backend & ML** | **Python** | Core programming language |
+| | **Scikit-learn** | Random Forest & SVM (Baseline Models) |
+| | **Pandas** | Data manipulation and CSV handling |
+| | **OpenCV** | Image processing (loading, color conversion, etc.) |
+| | **SciPy & NumPy** | Statistical analysis and numerical operations |
+| | *(Upcoming)* **TensorFlow / Keras** | For CNN Model |
+| **Frontend & UI** | **Streamlit** | Creating the interactive web application |
+| | **Matplotlib & Seaborn** | Data visualization (confusion matrix, plots) |
+| | **Pillow (PIL)** | Displaying sample images in the UI |
+| **Tooling** | **Git & GitHub** | Version control and source management |
+| | **venv** | Python virtual environment management |
+
+---
+
+## ✨ Features
+
+- 🧩 **Modular Feature Extraction:** Streamlit app to scan image directories, extract 10+ metadata features, and generate a feature CSV.  
+- 📊 **Data Visualization:** View class distribution graphs, sample images from each class, and a full data preview.  
+- 💾 **Downloadable Results:** Download the complete feature CSV directly from the app.  
+- 🤖 **Baseline Model Pipeline:**  
+  - **Train:** Build Random Forest and SVM models from the feature CSV.  
+  - **Evaluate:** View detailed classification reports and confusion matrices for both models.  
+  - **Predict:** Upload any image for instant scanner identification.  
+- 🔀 **Dual Model Support:** Choose between Random Forest or SVM for your prediction.  
+- 🧠 *(Upcoming)* **Deep Learning Model:** Integration of a CNN for end-to-end image-based classification.
+
+---
+
+## 📸 Demo / Screenshots
+
+Showcase your project! Add screenshots of your application in action.
+
+1. **Main Prediction App**  
+   *(src/models/baseline/Main_app.py)*  
+   > Add screenshot of the prediction tab with an image uploaded.
+
+2. **Feature Extraction App**  
+   *(src/features/baseline/extractor_frontend.py)*  
+   > Add screenshot of the feature extraction UI showing the graph and sample images.
+
+3. **Model Evaluation Page**  
+   *(Main_app.py - "Evaluate Models" Tab)*  
+   > Add screenshot of the classification report and confusion matrix.
+
+---
+
+## 🚀 Installation
+
+Follow these steps to set up the project locally.
+
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/PriyanshPorwal999/AI_ML_TraceFinder.git
+cd AI_ML_TraceFinder
+
+
+
+
+
+<!-- #  AI TraceFinder — Forensic Scanner Identification  
 
 ##  Overview  
 AI TraceFinder is a forensic machine learning platform that identifies the **source scanner device** used to digitize a document or image. Each scanner (brand/model) introduces unique **noise, texture, and compression artifacts** that serve as a fingerprint. By analyzing these patterns, AI TraceFinder enables **fraud detection, authentication, and forensic validation** in scanned documents.  
@@ -83,4 +184,6 @@ ai-tracefinder/
 ├─ notebooks/            
 ├─ reports/              
 └─ README.md
-```
+``` -->
+
+
