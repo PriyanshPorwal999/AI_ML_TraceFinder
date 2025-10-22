@@ -1,5 +1,5 @@
-# Python
-__pycache__/
+# Python cache files
+pycache/
 *.pyc
 *.pyo
 *.pyd
@@ -7,6 +7,9 @@ __pycache__/
 
 # Virtual environment
 venv/
+.venv/
+env/
+ENV/
 
 # IDE configs
 .vscode/
@@ -15,3 +18,25 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# --- Project-Specific ---
+# !! CRITICAL: Ignore all data, models, and results !!
+# Ignore the raw data folder
+data/
+
+# Ignore all generated artifacts and results
+results/
+metadata_features.csv
+
+# Ignore saved models and test data
+src/models/baseline/models/
+src/models/baseline/data/
+
+# for CNN
+src/models/cnn/models/
+src/models/cnn/data/
+
+# Ignore model files directly by extension
+*.pkl
+*.h5
+*.pth
