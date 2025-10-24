@@ -26,6 +26,7 @@ data/
 
 # Ignore all generated artifacts and results
 results/
+artifacts/
 metadata_features.csv
 
 # Ignore saved models and test data
