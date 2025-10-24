@@ -95,13 +95,13 @@ def predict_scanner(img_path, model_choice="rf"):
 
     # 4. Make prediction
     model = RF_MODEL if model_choice == "rf" else SVM_MODEL
-    # pred = model.predict(X_scaled)[0]
-    # prob = model.predict_proba(X_scaled)[0]
-
-    # return pred, prob, model.classes_
-
+    pred = model.predict(X_scaled)[0]
     prob = model.predict_proba(X_scaled)[0]
-    return prob, model.classes_
+
+    return pred, prob, model.classes_
+
+    # prob = model.predict_proba(X_scaled)[0]
+    # return prob, model.classes_
 
 
 
