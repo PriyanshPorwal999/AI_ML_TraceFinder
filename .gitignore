@@ -30,14 +30,14 @@ artifacts/
 metadata_features.csv
 
 # Ignore saved models and test data
-src/models/baseline/models/
+# src/models/baseline/models/
 src/models/baseline/data/
 
 # for CNN
-src/models/cnn/models/
+# src/models/cnn/models/
 src/models/cnn/data/
 
 # Ignore model files directly by extension
-*.pkl
+# *.pkl
 *.h5
 *.pth
