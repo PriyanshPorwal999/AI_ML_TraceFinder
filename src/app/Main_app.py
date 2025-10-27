@@ -52,7 +52,7 @@ except Exception as e:
 
 # --- Define Paths ---
 # Baseline paths
-BASELINE_SCRIPT_ROOT = os.path.join(SRC_DIR, 'scripts') # <-- Path to train_baseline.py
+BASELINE_SCRIPT_ROOT = os.path.join(SRC_DIR, 'scripts') # <-- Path to training_baseline.py
 BASELINE_MODEL_DIR = os.path.join(SRC_DIR, "models", "baseline")
 BASELINE_ARTIFACTS_DIR = os.path.join(PROJECT_ROOT, "artifacts") # <-- Test splits moved here
 BASELINE_FEATURES_CSV = os.path.join(PROJECT_ROOT, "results", "metadata_features.csv") 
@@ -226,7 +226,7 @@ elif menu=="Train Baseline" and BASELINE_AVAILABLE:
                     # Run the script from its new location
                     # We pass the full python executable path to avoid venv issues
                     python_exe = os.path.join(PROJECT_ROOT, "venv", "Scripts", "python.exe")
-                    script_path = os.path.join(BASELINE_SCRIPT_ROOT, "train_baseline.py")
+                    script_path = os.path.join(BASELINE_SCRIPT_ROOT, "training_baseline.py")
                     # Use subprocess to run the script in its own process
                     # This is more robust than os.chdir
                     result = subprocess.run([python_exe, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
