@@ -30,8 +30,6 @@ Every scanner, due to its unique hardware, introduces microscopic and invisible 
 - Detect forgeries where unauthorized scanners were used.  
 - Verify the authenticity of scanned evidence in a forensic context.
 
-> 🖼️ *(Your screenshot of the main app prediction interface would look great here!)*
-
 ---
 
 ## 🛠 Tech Stack
