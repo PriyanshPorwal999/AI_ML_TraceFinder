@@ -70,18 +70,13 @@ This project leverages a modern stack for machine learning, image processing, an
 
 ## 📸 Demo / Screenshots
 
-Showcase your project! Add screenshots of your application in action.
-
 1.  **Main Prediction App**
-    *(src/models/baseline/Main_app.py)*
     ![Main prediction app demo](./img/Main%20Prediction%20App.png)
 
 2.  **Feature Extraction App**
-    *(src/features/baseline/extractor_frontend.py)*
     ![Feature extraction app demo](./img/Feature%20Extraction%20App.png)
 
 3.  **Model Evaluation Page**
-    *(Main_app.py - "Evaluate Models" Tab)*
     ![Model evaluation demo](./img/Model%20Evaluation%20Page.png)
 
 4.  **Data Visualization Page**
