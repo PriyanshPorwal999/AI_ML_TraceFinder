@@ -137,7 +137,7 @@ st.title("📊 AI TraceFinder - Scanner Identification")
 st.sidebar.title("Navigation")
 menu_options=["Predict Scanner"]
 if BASELINE_AVAILABLE: menu_options.extend(["Evaluate Baseline","Train Baseline","Explore Baseline Features"])
-if CNN_AVAILABLE: menu_options.extend(["Evaluate CNN (Script Info)","Train CNN (Script Info)","Test CNN (Script Info)"])
+if CNN_AVAILABLE: menu_options.extend(["Evaluate CNN", "Train CNN"])
 menu_options.append("📊 Dataset Visualization")
 default_index=0
 menu=st.sidebar.radio("Choose Action", menu_options, index=default_index, key="main_menu")
@@ -203,72 +203,6 @@ if menu == "Predict Scanner":
                 if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
                       try: os.remove(temp_path_cnn)
                       except OSError: pass
-
-
-# elif menu == "📊 Dataset Visualization":
-#     st.header("📊 Dataset Visualization Dashboard")
-#     st.write("View class distribution, random samples, and dataset statistics.")
-
-#     from scripts.visualize_data import get_image_data, get_dataset_summary
-
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_image_data(base_dir):
-#         return get_image_data(base_dir)
-
-
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_dataset_summary(base_dir):
-#         return get_dataset_summary(base_dir)
-
-#     # from scripts.visualize_data import get_dataset_summary
-#     DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
-
-#     if not os.path.exists(DATA_DIR):
-#         st.error(f"Dataset folder not found: {DATA_DIR}")
-#         st.stop()
-
-#     with st.spinner("Analyzing dataset..."):
-#         df, class_counts, stats = get_dataset_summary(DATA_DIR)
-
-#     if df is None:
-#         st.warning("No images found in dataset.")
-#         st.stop()
-
-#     # --- Summary Stats ---
-#     st.subheader("📦 Dataset Summary")
-#     c1, c2, c3, c4 = st.columns(4)
-#     c1.metric("Total Classes", stats["total_classes"])
-#     c2.metric("Total Images", stats["total_images"])
-#     c3.metric("Avg. Resolution", stats["avg_resolution"])
-#     c4.metric("Most Common Format", stats["common_format"])
-
-#     # --- Class Distribution ---
-#     st.subheader("📈 Class Distribution")
-#     fig, ax = plt.subplots(figsize=(10, 6))
-#     sns.barplot(x="Class", y="Image Count", data=class_counts, hue="Class", dodge=False, legend=False, palette="viridis")
-#     plt.xticks(rotation=90)
-#     st.pyplot(fig)
-#     plt.close(fig)
-
-#     # --- Random Samples ---
-#     st.subheader("🖼️ Sample Images from Each Class")
-#     import random
-#     from PIL import Image
-
-#     for class_name in class_counts["Class"]:
-#         subset = df[df["Class"] == class_name]
-#         if subset.empty:
-#             continue
-#         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
-#         st.markdown(f"### 📁 {class_name} ({len(subset)} images)")
-#         cols = st.columns(len(sample_paths))
-#         for i, img_path in enumerate(sample_paths):
-#             try:
-#                 img = Image.open(img_path)
-#                 cols[i].image(img, use_container_width=True)
-#             except:
-#                 continue
-
 
 elif menu == "📊 Dataset Visualization":
     st.header("📊 Dataset Visualization Dashboard")
