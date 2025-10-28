@@ -44,8 +44,8 @@ This project leverages a modern stack for machine learning, image processing, an
 | | **Scikit-learn** | Random Forest & SVM (Baseline Models) |
 | | **Pandas** | Data manipulation and CSV handling |
 | | **OpenCV** | Image processing (loading, color conversion, etc.) |
-| | **SciPy & NumPy** | Statistical analysis and numerical operations |
-| | *(Upcoming)* **TensorFlow / Keras** | For CNN Model |
+| | **NumPy** | numerical operations |
+| | **TensorFlow / Keras** | For CNN Model |
 | **Frontend & UI** | **Streamlit** | Creating the interactive web application |
 | | **Matplotlib & Seaborn** | Data visualization (confusion matrix, plots) |
 | | **Pillow (PIL)** | Displaying sample images in the UI |
@@ -64,7 +64,7 @@ This project leverages a modern stack for machine learning, image processing, an
   - **Evaluate:** View detailed classification reports and confusion matrices for both models.  
   - **Predict:** Upload any image for instant scanner identification.  
 - 🔀 **Dual Model Support:** Choose between Random Forest or SVM for your prediction.  
-- 🧠 *(Upcoming)* **Deep Learning Model:** Integration of a CNN for end-to-end image-based classification.
+- 🧠 **Deep Learning Model:** Integration of a CNN for end-to-end image-based classification.
 
 ---
 
@@ -74,15 +74,21 @@ Showcase your project! Add screenshots of your application in action.
 
 1. **Main Prediction App**  
    *(src/models/baseline/Main_app.py)*  
-   > Add screenshot of the prediction tab with an image uploaded.
+   <!-- > Add screenshot of the prediction tab with an image uploaded. -->
+   ![Main prediction app demo](./img/Main%20Prediction%20App.png)
 
 2. **Feature Extraction App**  
    *(src/features/baseline/extractor_frontend.py)*  
-   > Add screenshot of the feature extraction UI showing the graph and sample images.
+   <!-- > Add screenshot of the feature extraction UI showing the graph and sample images. -->
+   ![Feature extraction app demo](./img/Feature%20Extraction%20App.png)
 
 3. **Model Evaluation Page**  
    *(Main_app.py - "Evaluate Models" Tab)*  
-   > Add screenshot of the classification report and confusion matrix.
+   <!-- > Add screenshot of the classification report and confusion matrix. -->
+   ![Model evaluation demo](./img/Model%20Evaluation%20Page.png)
+
+4. **Data Visualization Page**
+   ![Data visualization demo](./img/Data%20Visualization%20Page.png)
 
 ---
 
