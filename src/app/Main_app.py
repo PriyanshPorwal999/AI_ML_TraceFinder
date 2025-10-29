@@ -11,6 +11,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 import time
 from PIL import Image # For displaying uploaded image
 import subprocess # For running scripts
+import json
 
 # --- Path Setup ---
 # This file is in src/app/
@@ -315,17 +316,47 @@ elif menu=="Train Baseline" and BASELINE_AVAILABLE:
 
 elif menu=="Explore Baseline Features" and BASELINE_AVAILABLE: baseline_feature_explorer()
 
-elif menu=="Evaluate CNN" and CNN_AVAILABLE:
-    st.header("CNN Evaluation Info"); 
-    # st.info("Run via terminal for details.")
-    # # --- FIX: Use raw string for path ---
-    # st.write(r"Command (from project root `D:\Project_Trace_Finder`):")
-    # st.code("python src/scripts/evaluate_cnn.py", language="bash") # <-- Updated path
-    # # --- END FIX ---
-    # st.markdown("- Loads final CNN model.\n- Recreates test split.\n- Prints metrics.\n- Saves plot to `results/cnn_confusion_matrix_27dim.png`.")
-    cnn_cm_path=os.path.join(RESULTS_DIR,"cnn_confusion_matrix_27dim.png")
-    if os.path.exists(cnn_cm_path): st.image(cnn_cm_path,caption="CNN Confusion Matrix (27 Feat)")
-    else: st.write("(Run script to generate plot)")
+elif menu == "Evaluate CNN" and CNN_AVAILABLE:
+    st.header("CNN Model Evaluation")
+
+    # --- Define paths ---
+    cnn_cm_path = os.path.join(RESULTS_DIR, "cnn_confusion_matrix_27dim.png")
+    cnn_report_path = os.path.join(RESULTS_DIR, "cnn_classification_report.json")
+
+    # --- 1. Display Classification Report ---
+    st.subheader("Classification Report")
+    
+    if os.path.exists(cnn_report_path):
+        try:
+            # Load the saved JSON report
+            with open(cnn_report_path, 'r') as f:
+                report_dict = json.load(f)
+            
+            # Convert it to a Pandas DataFrame
+            df_report = pd.DataFrame(report_dict).transpose()
+            
+            # Format the 'support' column to be a clean integer
+            if 'support' in df_report.columns:
+                 df_report['support'] = df_report['support'].astype(float).astype(int)
+            
+            # Display the DataFrame as a nice table
+            st.dataframe(df_report)
+            
+        except Exception as e:
+            st.error(f"Error loading classification report: {e}")
+    else:
+        st.warning("Classification report (`cnn_classification_report.json`) not found.")
+        st.info("You must run the evaluation script first to generate the report:")
+        st.code("python src/scripts/eval_hybrid_cnn.py", language="bash")
+
+    # --- 2. Display Confusion Matrix ---
+    st.subheader("Confusion Matrix")
+    
+    if os.path.exists(cnn_cm_path):
+        st.image(cnn_cm_path, caption="CNN Confusion Matrix (27 Feat)")
+    else:
+        st.warning("Confusion matrix (`cnn_confusion_matrix_27dim.png`) not found.")
+        st.info("Run the evaluation script to generate this image.")
 
 elif menu=="Train CNN" and CNN_AVAILABLE:
     st.header("Train CNN Model Info"); 
