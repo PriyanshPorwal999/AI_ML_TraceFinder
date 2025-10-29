@@ -17,6 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
 import time
 import sys
+import json
 
 # --- Path Setup ---
 # This file is in src/scripts/
@@ -36,10 +37,11 @@ RES_PATH = os.path.join(ARTIFACTS_DIR, "official_wiki_residuals.pkl")
 FEATURES_PATH = os.path.join(ARTIFACTS_DIR, "features_27dim.pkl") # Use 27-dim features
 LE_PATH = os.path.join(ARTIFACTS_DIR, "hybrid_label_encoder.pkl")
 SCALER_PATH = os.path.join(ARTIFACTS_DIR, "hybrid_feat_scaler.pkl") # 27-dim scaler
-MODEL_PATH = os.path.join(MODEL_LOAD_DIR, "scanner_hybrid_final_27dim.keras") # 27-dim final model
+MODEL_PATH = os.path.join(MODEL_LOAD_DIR, "models", "scanner_hybrid_final.keras") # 27-dim final model
 
 # Output path
 PLOT_SAVE_PATH = os.path.join(RESULTS_DIR, "cnn_confusion_matrix_27dim.png")
+REPORT_SAVE_PATH = os.path.join(RESULTS_DIR, "cnn_classification_report.json") 
 
 EXPECTED_FEATURE_DIM = 27
 SEED = 42
@@ -149,8 +151,8 @@ if X_img_te is not None and X_feat_te is not None and y_te_cat is not None and X
         print("🔄 Predicting on test set...")
         model_feat_dim = -1
         try:
-             # Check the input layer name from your train_cnn.py (it's "handcrafted_features_input")
-             model_feat_dim = model.get_layer(name="handcrafted_features_input").input_shape[-1]
+             # Check the input layer name from your train_cnn.py (it's "handcrafted_features")
+             model_feat_dim = model.get_layer(name="handcrafted_features").input_shape[-1]
              if model_feat_dim != EXPECTED_FEATURE_DIM:
                  raise ValueError(f"Model expects {model_feat_dim} features, data has {EXPECTED_FEATURE_DIM}.")
         except Exception as shape_e:
@@ -163,10 +165,26 @@ if X_img_te is not None and X_feat_te is not None and y_te_cat is not None and X
         print(f"\n✅ Test Accuracy: {test_acc*100:.2f}%")
         print("\n✅ Classification Report:")
         target_names = le.classes_.tolist()
+        # try:
+        #     report = classification_report(y_true_idx, y_pred_idx, target_names=target_names, zero_division=0)
+        #     print(report)
+        # except ValueError as report_error: print(f"Report Error: {report_error}")
+        
         try:
-            report = classification_report(y_true_idx, y_pred_idx, target_names=target_names, zero_division=0)
-            print(report)
-        except ValueError as report_error: print(f"Report Error: {report_error}")
+            # Get report as a string to print
+            report_str = classification_report(y_true_idx, y_pred_idx, target_names=target_names, zero_division=0)
+            print(report_str)
+
+            # Get report as a dictionary to save
+            report_dict = classification_report(y_true_idx, y_pred_idx, target_names=target_names, zero_division=0, output_dict=True)
+
+            # Save the dictionary as a JSON file
+            with open(REPORT_SAVE_PATH, 'w') as f:
+                json.dump(report_dict, f, indent=4)
+            print(f"✅ Classification Report saved to {REPORT_SAVE_PATH}")
+
+        except ValueError as report_error: 
+            print(f"Report Error: {report_error}")
         
         print("\n🔄 Generating Confusion Matrix...")
         try:
