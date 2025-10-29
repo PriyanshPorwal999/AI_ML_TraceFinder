@@ -82,6 +82,12 @@ This project leverages a modern stack for machine learning, image processing, an
 
 ---
 
+## 📈 Accuracy & Performance
+* **Hybrid CNN model test accuracy: 82.21%**
+* **Overall weighted avg:** Precision 0.83, Recall 0.82, F1-score 0.82, Test sample(517 images)
+
+---
+
 ## 🚀 Installation
 
 Follow these steps to set up the project locally.
