@@ -24,6 +24,7 @@ PROJECT_ROOT = os.path.dirname(SRC_DIR)
 ARTIFACTS_DIR = os.path.join(PROJECT_ROOT, "artifacts")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
 
+
 # Add src to path so it can find preprocess, models, scripts
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
@@ -38,6 +39,9 @@ try:
         preprocess_residual_pywt
     )
     print("✅ Forensics module imported successfully.")
+    from scripts.explainability import make_gradcam_heatmap, get_superimposed_image
+    print("✅ Explainability modules imported successfully.")
+
 except ImportError as e:
     print(f"⚠️ Warning: Could not load forensics components: {e}.")
     # Define placeholder flags to avoid breaking the app
@@ -314,16 +318,21 @@ if menu == "🚀 Predict Scanner":
                             else:
                                 st.warning("⚠️ Probability/Class mismatch.")
 
-                    # ========== HYBRID FORENSICS ==========
+
+
+                        # ========== HYBRID FORENSICS ==========
                     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
                         s_label, s_conf, all_probs_dict = None, None, {}
-
+                        t_res = None  # Initialize t_res
+                    
                         # --- Scanner Prediction ---
                         if FORENSICS_AVAILABLE:
+                            # --- Import hybrid model and feature extractor for explainability ---
+                            from scripts.predict_forensics import hyb_model, make_scanner_feats_from_res
+                    
                             s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
-
+                    
                             # --- Tamper Detection ---
-                            t_res = None
                             if HAS_IMG:
                                 t_res = infer_tamper_image(temp_path)
                                 tamper_source = "Image-Level (18D)"
@@ -332,26 +341,33 @@ if menu == "🚀 Predict Scanner":
                                 tamper_source = "Patch Fallback (22D)"
                             else:
                                 tamper_source = "Disabled"
+                    
                         else:
                             pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
                             s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
                             st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
-
+                    
                         # --- Tabs for results ---
-                        tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
-
+                        tab_scanner, tab_tamper, tab_explain = st.tabs([
+                            "Scanner Identification",
+                            "Tamper Detection",
+                            "🔬 Explainability (Grad-CAM)"
+                        ])
+                    
+                        # --- SCANNER IDENTIFICATION TAB ---
                         with tab_scanner:
                             st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
                             if all_probs_dict:
                                 prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
                                 prob_df['Confidence'] = prob_df['Probability'] * 100
                                 st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
-
+                    
+                        # --- TAMPER DETECTION TAB ---
                         with tab_tamper:
                             if FORENSICS_AVAILABLE and t_res:
                                 st.metric(
-                                    "Tamper Label", 
-                                    t_res["tamper_label"], 
+                                    "Tamper Label",
+                                    t_res["tamper_label"],
                                     delta=f"{t_res['confidence']:.1f}% Confidence",
                                     delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
                                 )
@@ -361,6 +377,107 @@ if menu == "🚀 Predict Scanner":
                                     st.write(f"Patch Hits: **{t_res['hits']}**")
                             else:
                                 st.info("Tamper detection is only available with Hybrid Forensics model.")
+                    
+                        # --- EXPLAINABILITY TAB ---
+                        with tab_explain:
+                            st.subheader("Model Decision Visualization (Grad-CAM)")
+                            st.write("This shows which parts of the *noise residual* the model focused on.")
+                            st.caption("Note: This refers to the **`last_conv_layer`** we named in the training script.")
+                    
+                            if st.button("Generate Heatmap"):
+                                with st.spinner("Generating Grad-CAM..."):
+                                    try:
+                                        # 1. Get the preprocessed inputs
+                                        residual = preprocess_residual_pywt(temp_path)
+                                        x_img = np.expand_dims(residual, axis=(0, -1)).astype(np.float32)
+                    
+                                        # 2. Get the 27-dim features
+                                        x_feat = make_scanner_feats_from_res(residual)
+                                       
+                                        # 'last_conv_layer' = The new name we just added
+                                        # 'conv2d_13' = The old name from the error message
+                                        possible_layer_names = ["last_conv_layer", "conv2d_13"]
+                    
+                                        # 3. Generate heatmap
+                                        heatmap = make_gradcam_heatmap(
+                                            x_img,
+                                            x_feat,
+                                            hyb_model,             # Loaded hybrid model
+                                            # "last_conv_layer"      # Layer used for Grad-
+                                            possible_layer_names
+                                        )
+                    
+                                        # 4. Superimpose heatmap on the original image
+                                        superimposed_img, heatmap_img = get_superimposed_image(temp_path, heatmap, alpha=0.5)
+                    
+                                        # 5. Display results
+                                        st.write("Heatmap (Red = Important):")
+                                        st.image(
+                                            superimposed_img,
+                                            caption="Grad-CAM Superimposed on Original Image",
+                                            use_container_width=True
+                                        )
+                    
+                                        st.write("Raw Heatmap (Normalized):")
+                                        st.image(
+                                            heatmap_img,
+                                            caption="Raw Heatmap",
+                                            use_container_width=True
+                                        )
+                    
+                                    except Exception as e:
+                                        st.error(f"Could not generate Grad-CAM: {e}")
+                                        st.exception(e)
+
+
+
+        #             # ========== HYBRID FORENSICS ==========
+        #             elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
+        #                 s_label, s_conf, all_probs_dict = None, None, {}
+
+        #                 # --- Scanner Prediction ---
+        #                 if FORENSICS_AVAILABLE:
+        #                     s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
+
+        #                     # --- Tamper Detection ---
+        #                     t_res = None
+        #                     if HAS_IMG:
+        #                         t_res = infer_tamper_image(temp_path)
+        #                         tamper_source = "Image-Level (18D)"
+        #                     elif HAS_PATCH:
+        #                         t_res = infer_tamper_single_patch(temp_path)
+        #                         tamper_source = "Patch Fallback (22D)"
+        #                     else:
+        #                         tamper_source = "Disabled"
+        #                 else:
+        #                     pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
+        #                     s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
+        #                     st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
+
+        #                 # --- Tabs for results ---
+        #                 tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
+
+        #                 with tab_scanner:
+        #                     st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
+        #                     if all_probs_dict:
+        #                         prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+        #                         prob_df['Confidence'] = prob_df['Probability'] * 100
+        #                         st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
+
+        #                 with tab_tamper:
+        #                     if FORENSICS_AVAILABLE and t_res:
+        #                         st.metric(
+        #                             "Tamper Label", 
+        #                             t_res["tamper_label"], 
+        #                             delta=f"{t_res['confidence']:.1f}% Confidence",
+        #                             delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+        #                         )
+        #                         st.caption(f"Method: {tamper_source}")
+        #                         st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}** (Threshold: {t_res['threshold']:.3f})")
+        #                         if t_res['hits'] != -1:
+        #                             st.write(f"Patch Hits: **{t_res['hits']}**")
+        #                     else:
+        #                         st.info("Tamper detection is only available with Hybrid Forensics model.")
 
             except Exception as e:
                 st.error(f"Prediction error: {e}")
