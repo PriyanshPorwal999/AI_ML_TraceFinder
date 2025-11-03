@@ -13,6 +13,7 @@ from PIL import Image # For displaying uploaded image
 import subprocess # For running scripts
 import json
 import cv2
+import pickle
 
 # --- Path Setup ---
 # This file is in src/app/
@@ -1143,7 +1144,30 @@ elif (menu == "📊 Evaluate Baseline" and BASELINE_AVAILABLE) or (menu == "📈
             else:
                 st.warning("Confusion matrix (`cnn_confusion_matrix_27dim.png`) not found.")
                 st.info("Run the evaluation script to generate this image.")
+        
+        st.divider()
+        with st.expander("🎓 Training & Validation History", expanded=True):
+            history_path = os.path.join(ARTIFACTS_DIR, "hybrid_training_history.pkl") 
+            # Note: Your training script saves it as "hybrid_training_history_27dim.pkl"
+            # Please check your 'artifacts' folder and use the correct filename.
+            
+            # Let's check for the correct file name based on your 'train_hybrid_cnn.py'
+            history_path_27dim = os.path.join(ARTIFACTS_DIR, "hybrid_training_history.pkl")
 
+            if os.path.exists(history_path):
+                with open(history_path, "rb") as f:
+                    history = pickle.load(f)
+                
+                # Convert history dict to DataFrame for easy plotting
+                history_df = pd.DataFrame(history)
+                
+                st.write("Model Accuracy over Epochs:")
+                st.line_chart(history_df[['accuracy', 'val_accuracy']])
+                
+                st.write("Model Loss over Epochs:")
+                st.line_chart(history_df[['loss', 'val_loss']])
+            else:
+                st.info(f"Training history file not found at `{history_path}`. Run '🧠 Train CNN' to generate it.")
 
 
 
