@@ -22,6 +22,23 @@ PROJECT_ROOT = os.path.dirname(SRC_DIR)
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
 
+
+try:
+    from scripts.predict_forensics import (
+        predict_scanner_hybrid_forensics, 
+        infer_tamper_image, 
+        infer_tamper_single_patch,
+        FORENSICS_AVAILABLE, HAS_IMG, HAS_PATCH # Use these flags
+    )
+    print("✅ Forensics module imported successfully.")
+except ImportError as e:
+    print(f"⚠️ Warning: Could not load forensics components: {e}.")
+    # Define placeholder flags to avoid breaking the app
+    FORENSICS_AVAILABLE = False
+    HAS_IMG = False
+    HAS_PATCH = False
+
+
 # --- Safe Import Baseline ---
 BASELINE_AVAILABLE = False
 try:
@@ -61,6 +78,7 @@ BASELINE_FEATURES_CSV = os.path.join(PROJECT_ROOT, "results", "metadata_features
 CNN_MODEL_DIR = os.path.join(SRC_DIR, "models", "cnn")
 CNN_ARTIFACTS_DIR = os.path.join(PROJECT_ROOT, "artifacts")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
+
 
 
 # === Baseline Evaluation Function ===
@@ -144,13 +162,200 @@ default_index=0
 menu=st.sidebar.radio("Choose Action", menu_options, index=default_index, key="main_menu")
 
 # --- Page Content ---
+# if menu == "Predict Scanner":
+#     st.header("Upload Image to Identify Scanner Source")
+#     available_model_types=[]
+#     if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
+#     if CNN_AVAILABLE: available_model_types.append("CNN (Hybrid - 27 Feat)")
+#     if not available_model_types: st.error("❌ No models loaded."); st.stop()
+#     model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
+
+    # # Baseline Prediction
+    # if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
+    #     st.subheader("Baseline Prediction")
+    #     baseline_model_choice_str=st.selectbox("Algorithm",["Random Forest","SVM"],key="baseline_model_predict")
+    #     uploaded_file_base=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="baseline_uploader")
+    #     if uploaded_file_base is not None:
+    #         with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_base.name)[1]) as tmp_file_base:
+    #             tmp_file_base.write(uploaded_file_base.getvalue()); temp_path_baseline=tmp_file_base.name
+    #         try:
+    #             st.image(uploaded_file_base, caption="Uploaded", width=256) # FIX: Use uploaded file
+    #             with st.spinner("Analyzing (Baseline)..."):
+    #                 model_code="rf" if baseline_model_choice_str=="Random Forest" else "svm"
+    #                 pred_label, prob_list, classes=predict_scanner_baseline(temp_path_baseline, model_choice=model_code)
+    #             if pred_label is not None and prob_list is not None and classes is not None and len(classes)>0:
+    #                 st.success(f"🖼️ Prediction: **{pred_label}**")
+    #                 st.write("Probabilities:")
+    #                 if len(prob_list)==len(classes):
+    #                     prob_df=pd.DataFrame({'Class':classes,'Probability':prob_list}); prob_df['Confidence (%)']=prob_df['Probability']*100
+    #                     prob_df_display=prob_df[['Class','Confidence (%)']].copy(); prob_df_display['Confidence (%)']=prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
+    #                     st.dataframe(prob_df_display.sort_values(by='Confidence (%)',ascending=False,key=lambda x:x.str.rstrip('%').astype(float)))
+    #                 else: st.warning("Prob/class mismatch.")
+    #             else: st.error("Baseline prediction failed.")
+    #         except FileNotFoundError as e: st.error(f"Baseline artifacts missing: {e}")
+    #         except Exception as e: st.error(f"Baseline prediction error: {e}")
+    #         finally:
+    #             if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
+    #                 try: os.remove(temp_path_baseline)
+    #                 except OSError: pass
+
+#     # CNN Prediction
+#     elif model_type=="CNN (Hybrid - 27 Feat)" and CNN_AVAILABLE:
+#         st.subheader("CNN Prediction (27 Features)")
+#         uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
+#         if uploaded_file_cnn is not None:
+#              with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
+#                  tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
+#              try:
+#                 st.image(uploaded_file_cnn, caption="Uploaded", width=256) # FIX: Use uploaded file
+#                 with st.spinner("Analyzing (CNN)..."):
+#                     pred_label_cnn, prob_df_cnn, _=predict_scanner_cnn(temp_path_cnn)
+#                 if pred_label_cnn is not None and prob_df_cnn is not None:
+#                     st.success(f"🧠 Prediction: **{pred_label_cnn}**")
+#                     st.write("Probabilities:")
+#                     prob_df_cnn_display=prob_df_cnn.copy(); prob_df_cnn_display.rename(columns={'Probability':'Confidence (%)'},inplace=True)
+#                     prob_df_cnn_display['Confidence (%)']=(prob_df_cnn_display['Confidence (%)']*100).map('{:.2f}%'.format)
+#                     st.dataframe(prob_df_cnn_display) # Already sorted
+#                 else: st.error("CNN prediction failed. Check console logs.")
+#              except Exception as e: st.error(f"CNN prediction error: {e}")
+#              finally:
+#                 if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
+#                       try: os.remove(temp_path_cnn)
+#                       except OSError: pass
+
+
+# if menu == "Predict Scanner":
+#     st.header("Upload Image to Identify Scanner Source")
+#     available_model_types=[]
+#     if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
+#     # Update CNN label to reflect its new functionality
+#     if FORENSICS_AVAILABLE: 
+#         available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
+#     elif CNN_AVAILABLE: 
+#         available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
+
+#     if not available_model_types: st.error("❌ No models loaded."); st.stop()
+#     model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
+
+
+#     # Baseline Prediction
+#     if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
+#         st.subheader("Baseline Prediction")
+#         baseline_model_choice_str=st.selectbox("Algorithm",["Random Forest","SVM"],key="baseline_model_predict")
+#         uploaded_file_base=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="baseline_uploader")
+#         if uploaded_file_base is not None:
+#             with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_base.name)[1]) as tmp_file_base:
+#                 tmp_file_base.write(uploaded_file_base.getvalue()); temp_path_baseline=tmp_file_base.name
+#             try:
+#                 st.image(uploaded_file_base, caption="Uploaded", width=256) # FIX: Use uploaded file
+#                 with st.spinner("Analyzing (Baseline)..."):
+#                     model_code="rf" if baseline_model_choice_str=="Random Forest" else "svm"
+#                     pred_label, prob_list, classes=predict_scanner_baseline(temp_path_baseline, model_choice=model_code)
+#                 if pred_label is not None and prob_list is not None and classes is not None and len(classes)>0:
+#                     st.success(f"🖼️ Prediction: **{pred_label}**")
+#                     st.write("Probabilities:")
+#                     if len(prob_list)==len(classes):
+#                         prob_df=pd.DataFrame({'Class':classes,'Probability':prob_list}); prob_df['Confidence (%)']=prob_df['Probability']*100
+#                         prob_df_display=prob_df[['Class','Confidence (%)']].copy(); prob_df_display['Confidence (%)']=prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
+#                         st.dataframe(prob_df_display.sort_values(by='Confidence (%)',ascending=False,key=lambda x:x.str.rstrip('%').astype(float)))
+#                     else: st.warning("Prob/class mismatch.")
+#                 else: st.error("Baseline prediction failed.")
+#             except FileNotFoundError as e: st.error(f"Baseline artifacts missing: {e}")
+#             except Exception as e: st.error(f"Baseline prediction error: {e}")
+#             finally:
+#                 if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
+#                     try: os.remove(temp_path_baseline)
+#                     except OSError: pass
+    
+    
+#     # CNN/Hybrid Forensics Prediction (Updated Block)
+#     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
+#         st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
+#         uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
+
+#         if uploaded_file_cnn is not None:
+#             with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
+#                 tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
+
+#             try:
+#                 st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
+
+#                 # Optional: Set debug flag for sidebar output
+#                 st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
+
+#                 with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
+
+#                     # --- 1. Scanner Prediction (using the new module) ---
+#                     if FORENSICS_AVAILABLE:
+#                         s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
+
+#                         # --- 2. Tamper Detection ---
+#                         t_res = None
+#                         if HAS_IMG:
+#                             t_res = infer_tamper_image(temp_path_cnn)
+#                             tamper_source = "Image-Level (18D)"
+#                         elif HAS_PATCH:
+#                             t_res = infer_tamper_single_patch(temp_path_cnn)
+#                             tamper_source = "Patch Fallback (22D)"
+#                         else:
+#                             tamper_source = "Disabled"
+
+#                     else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
+#                         pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
+#                         st.error("Tamper check artifacts missing. Showing only Scanner ID.")
+
+#                 # --- Display Results ---
+#                 c1, c2 = st.columns(2)
+
+#                 with c1:
+#                     st.markdown("### 🖼️ Scanner Identification")
+#                     st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
+
+#                     # Display all probabilities
+#                     if FORENSICS_AVAILABLE:
+#                         prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+#                         prob_df['Confidence (%)'] = prob_df['Probability'] * 100
+#                         prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
+#                         prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
+#                         st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
+
+#                 if t_res:
+#                     with c2:
+#                         st.markdown("### 🚨 Tamper Detection")
+#                         st.metric(
+#                             "Tamper Label", 
+#                             t_res["tamper_label"], 
+#                             delta=f"{t_res['confidence']:.1f}% Confidence",
+#                             delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+#                         )
+#                         st.markdown(f"**Method:** _{tamper_source}_")
+#                         st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
+#                         st.write(f"Threshold: **{t_res['threshold']:.3f}**")
+#                         if t_res['hits'] != -1:
+#                             st.write(f"Patch Hits: **{t_res['hits']}**")
+
+#             except Exception as e: 
+#                 st.error(f"Hybrid Forensics error: {e}")
+#             finally:
+#                 if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
+#                     try: os.remove(temp_path_cnn)
+#                     except OSError: pass
+
+
+
 if menu == "Predict Scanner":
     st.header("Upload Image to Identify Scanner Source")
     available_model_types=[]
     if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
-    if CNN_AVAILABLE: available_model_types.append("CNN (Hybrid - 27 Feat)")
+    # Update CNN label to reflect its new functionality
+    if FORENSICS_AVAILABLE: 
+        available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
+    elif CNN_AVAILABLE: 
+        available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
+
     if not available_model_types: st.error("❌ No models loaded."); st.stop()
     model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
+
 
     # Baseline Prediction
     if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
@@ -180,30 +385,84 @@ if menu == "Predict Scanner":
                 if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
                     try: os.remove(temp_path_baseline)
                     except OSError: pass
+    
+    
+    # CNN/Hybrid Forensics Prediction (Updated Block - FIX APPLIED)
+    elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
+        # *** FIX: Wrap the entire block in st.container() to enforce rendering isolation ***
+        with st.container():
+            st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
+            uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
 
-    # CNN Prediction
-    elif model_type=="CNN (Hybrid - 27 Feat)" and CNN_AVAILABLE:
-        st.subheader("CNN Prediction (27 Features)")
-        uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
-        if uploaded_file_cnn is not None:
-             with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
-                 tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
-             try:
-                st.image(uploaded_file_cnn, caption="Uploaded", width=256) # FIX: Use uploaded file
-                with st.spinner("Analyzing (CNN)..."):
-                    pred_label_cnn, prob_df_cnn, _=predict_scanner_cnn(temp_path_cnn)
-                if pred_label_cnn is not None and prob_df_cnn is not None:
-                    st.success(f"🧠 Prediction: **{pred_label_cnn}**")
-                    st.write("Probabilities:")
-                    prob_df_cnn_display=prob_df_cnn.copy(); prob_df_cnn_display.rename(columns={'Probability':'Confidence (%)'},inplace=True)
-                    prob_df_cnn_display['Confidence (%)']=(prob_df_cnn_display['Confidence (%)']*100).map('{:.2f}%'.format)
-                    st.dataframe(prob_df_cnn_display) # Already sorted
-                else: st.error("CNN prediction failed. Check console logs.")
-             except Exception as e: st.error(f"CNN prediction error: {e}")
-             finally:
-                if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
-                      try: os.remove(temp_path_cnn)
-                      except OSError: pass
+            if uploaded_file_cnn is not None:
+                with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
+                    tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
+
+                try:
+                    st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
+
+                    # Optional: Set debug flag for sidebar output
+                    st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
+
+                    with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
+
+                        # --- 1. Scanner Prediction (using the new module) ---
+                        if FORENSICS_AVAILABLE:
+                            s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
+
+                            # --- 2. Tamper Detection ---
+                            t_res = None
+                            if HAS_IMG:
+                                t_res = infer_tamper_image(temp_path_cnn)
+                                tamper_source = "Image-Level (18D)"
+                            elif HAS_PATCH:
+                                t_res = infer_tamper_single_patch(temp_path_cnn)
+                                tamper_source = "Patch Fallback (22D)"
+                            else:
+                                tamper_source = "Disabled"
+
+                        else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
+                            pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
+                            st.error("Tamper check artifacts missing. Showing only Scanner ID.")
+
+                        # --- Display Results ---
+                        c1, c2 = st.columns(2)
+
+                        with c1:
+                            st.markdown("### 🖼️ Scanner Identification")
+                            st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
+
+                            # Display all probabilities
+                            if FORENSICS_AVAILABLE:
+                                prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+                                prob_df['Confidence (%)'] = prob_df['Probability'] * 100
+                                prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
+                                prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
+                                st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
+
+                        if t_res:
+                            with c2:
+                                st.markdown("### 🚨 Tamper Detection")
+                                st.metric(
+                                    "Tamper Label", 
+                                    t_res["tamper_label"], 
+                                    delta=f"{t_res['confidence']:.1f}% Confidence",
+                                    delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+                                )
+                                st.markdown(f"**Method:** _{tamper_source}_")
+                                st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
+                                st.write(f"Threshold: **{t_res['threshold']:.3f}**")
+                                if t_res['hits'] != -1:
+                                    st.write(f"Patch Hits: **{t_res['hits']}**")
+
+                except Exception as e: 
+                    st.error(f"Hybrid Forensics error: {e}")
+                finally:
+                    if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
+                        try: os.remove(temp_path_cnn)
+                        except OSError: pass
+
+
 
 elif menu == "📊 Dataset Visualization":
     st.header("📊 Dataset Visualization Dashboard")
