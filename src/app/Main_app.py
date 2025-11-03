@@ -18,6 +18,10 @@ import json
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(APP_DIR)
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
+
+ARTIFACTS_DIR = os.path.join(PROJECT_ROOT, "artifacts")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
+
 # Add src to path so it can find preprocess, models, scripts
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
@@ -78,7 +82,6 @@ BASELINE_FEATURES_CSV = os.path.join(PROJECT_ROOT, "results", "metadata_features
 CNN_MODEL_DIR = os.path.join(SRC_DIR, "models", "cnn")
 CNN_ARTIFACTS_DIR = os.path.join(PROJECT_ROOT, "artifacts")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, 'results')
-
 
 
 # === Baseline Evaluation Function ===
@@ -151,77 +154,382 @@ def baseline_feature_explorer():
     except Exception as e: st.error(f"Feature explorer error: {e}")
 
 # === STREAMLIT UI ===
+
+
+# === STREAMLIT UI ===
 st.set_page_config(page_title="AI TraceFinder", layout="wide")
 st.title("📊 AI TraceFinder - Scanner Identification")
+# --- Sidebar ---
 st.sidebar.title("Navigation")
-menu_options=["Predict Scanner"]
-if BASELINE_AVAILABLE: menu_options.extend(["Evaluate Baseline","Train Baseline","Explore Baseline Features"])
-if CNN_AVAILABLE: menu_options.extend(["Evaluate CNN", "Train CNN"])
-menu_options.append("📊 Dataset Visualization")
-default_index=0
-menu=st.sidebar.radio("Choose Action", menu_options, index=default_index, key="main_menu")
+# --- Base menu ---
+menu_options = ["🚀 Predict Scanner", "🛠️ Project Pipeline"]
+# --- Conditional menu items ---
+if BASELINE_AVAILABLE:
+    menu_options.extend([
+        "📊 Evaluate Baseline",
+        "⚙️ Train Baseline",
+        "🔍 Explore Baseline Features"
+    ])
+if CNN_AVAILABLE:
+    menu_options.extend([
+        "📈 Evaluate CNN",
+        "🧠 Train CNN"
+    ])
+# --- Always available menu ---
+menu_options.append("🖼️ Dataset Visualization")
+# --- Default selection ---
+default_index = 0
+# --- Sidebar Menu ---
+menu = st.sidebar.radio(
+    "Choose Action", 
+    menu_options, 
+    index=default_index, 
+    key="main_menu"
+)
 
-# --- Page Content ---
-# if menu == "Predict Scanner":
-#     st.header("Upload Image to Identify Scanner Source")
-#     available_model_types=[]
-#     if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
-#     if CNN_AVAILABLE: available_model_types.append("CNN (Hybrid - 27 Feat)")
-#     if not available_model_types: st.error("❌ No models loaded."); st.stop()
-#     model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
 
-    # # Baseline Prediction
-    # if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
-    #     st.subheader("Baseline Prediction")
-    #     baseline_model_choice_str=st.selectbox("Algorithm",["Random Forest","SVM"],key="baseline_model_predict")
-    #     uploaded_file_base=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="baseline_uploader")
-    #     if uploaded_file_base is not None:
-    #         with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_base.name)[1]) as tmp_file_base:
-    #             tmp_file_base.write(uploaded_file_base.getvalue()); temp_path_baseline=tmp_file_base.name
-    #         try:
-    #             st.image(uploaded_file_base, caption="Uploaded", width=256) # FIX: Use uploaded file
-    #             with st.spinner("Analyzing (Baseline)..."):
-    #                 model_code="rf" if baseline_model_choice_str=="Random Forest" else "svm"
-    #                 pred_label, prob_list, classes=predict_scanner_baseline(temp_path_baseline, model_choice=model_code)
-    #             if pred_label is not None and prob_list is not None and classes is not None and len(classes)>0:
-    #                 st.success(f"🖼️ Prediction: **{pred_label}**")
-    #                 st.write("Probabilities:")
-    #                 if len(prob_list)==len(classes):
-    #                     prob_df=pd.DataFrame({'Class':classes,'Probability':prob_list}); prob_df['Confidence (%)']=prob_df['Probability']*100
-    #                     prob_df_display=prob_df[['Class','Confidence (%)']].copy(); prob_df_display['Confidence (%)']=prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-    #                     st.dataframe(prob_df_display.sort_values(by='Confidence (%)',ascending=False,key=lambda x:x.str.rstrip('%').astype(float)))
-    #                 else: st.warning("Prob/class mismatch.")
-    #             else: st.error("Baseline prediction failed.")
-    #         except FileNotFoundError as e: st.error(f"Baseline artifacts missing: {e}")
-    #         except Exception as e: st.error(f"Baseline prediction error: {e}")
-    #         finally:
-    #             if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
-    #                 try: os.remove(temp_path_baseline)
-    #                 except OSError: pass
 
-#     # CNN Prediction
-#     elif model_type=="CNN (Hybrid - 27 Feat)" and CNN_AVAILABLE:
-#         st.subheader("CNN Prediction (27 Features)")
-#         uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
-#         if uploaded_file_cnn is not None:
-#              with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
-#                  tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
-#              try:
-#                 st.image(uploaded_file_cnn, caption="Uploaded", width=256) # FIX: Use uploaded file
-#                 with st.spinner("Analyzing (CNN)..."):
-#                     pred_label_cnn, prob_df_cnn, _=predict_scanner_cnn(temp_path_cnn)
-#                 if pred_label_cnn is not None and prob_df_cnn is not None:
-#                     st.success(f"🧠 Prediction: **{pred_label_cnn}**")
-#                     st.write("Probabilities:")
-#                     prob_df_cnn_display=prob_df_cnn.copy(); prob_df_cnn_display.rename(columns={'Probability':'Confidence (%)'},inplace=True)
-#                     prob_df_cnn_display['Confidence (%)']=(prob_df_cnn_display['Confidence (%)']*100).map('{:.2f}%'.format)
-#                     st.dataframe(prob_df_cnn_display) # Already sorted
-#                 else: st.error("CNN prediction failed. Check console logs.")
-#              except Exception as e: st.error(f"CNN prediction error: {e}")
-#              finally:
-#                 if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
-#                       try: os.remove(temp_path_cnn)
-#                       except OSError: pass
+# st.set_page_config(page_title="AI TraceFinder", layout="wide")
+# st.title("📊 AI TraceFinder - Scanner Identification")
+# st.sidebar.title("Navigation")
+# menu_options=["Predict Scanner"]
+# if BASELINE_AVAILABLE: menu_options.extend(["Evaluate Baseline","Train Baseline","Explore Baseline Features"])
+# if CNN_AVAILABLE: menu_options.extend(["Evaluate CNN", "Train CNN"])
+# menu_options.append("📊 Dataset Visualization")
+# default_index=0
+# menu=st.sidebar.radio("Choose Action", menu_options, index=default_index, key="main_menu")
+
+
+
+
+# === PREDICT SCANNER PAGE ===
+if menu == "🚀 Predict Scanner":
+    st.header("Upload Image to Identify Scanner Source")
+
+    # --- Collect available models dynamically ---
+    available_model_types = []
+    if BASELINE_AVAILABLE:
+        available_model_types.append("Baseline (RF/SVM)")
+    if FORENSICS_AVAILABLE:
+        available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
+    elif CNN_AVAILABLE:
+        available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
+
+    if not available_model_types:
+        st.error("❌ No models loaded.")
+        st.stop()
+
+    # --- Stylish segmented model selector ---
+    model_type = st.segmented_control(
+        "Select Model Type",
+        available_model_types,
+        key="predict_model_type"
+    )
+
+    # --- Two-column layout ---
+    col_input, col_results = st.columns(2)
+
+    # ===============================================================
+    # ============ LEFT COLUMN - IMAGE INPUT SECTION ================
+    # ===============================================================
+    with col_input:
+        st.subheader("Your Image")
+        with st.container(border=True):
+            if model_type == "Baseline (RF/SVM)":
+                baseline_model_choice_str = st.selectbox(
+                    "Algorithm", ["Random Forest", "SVM"], key="baseline_model_predict"
+                )
+                uploaded_file = st.file_uploader(
+                    "Upload a scanned image", 
+                    type=["tif", "tiff", "jpg", "png", "jpeg"], 
+                    key="baseline_uploader"
+                )
+            else:
+                uploaded_file = st.file_uploader(
+                    "Upload a scanned image", 
+                    type=["tif", "tiff", "jpg", "png", "jpeg"], 
+                    key="cnn_uploader"
+                )
+
+        if uploaded_file is not None:
+            st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
+
+    # ===============================================================
+    # ============ RIGHT COLUMN - ANALYSIS RESULTS ==================
+    # ===============================================================
+    with col_results:
+        st.subheader("Analysis Results")
+
+        if uploaded_file is not None:
+            # --- Create temp file ---
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=os.path.splitext(uploaded_file.name)[1]
+            ) as tmp_file:
+                tmp_file.write(uploaded_file.getvalue())
+                temp_path = tmp_file.name
+
+            try:
+                with st.spinner("Analyzing..."):
+
+                    # ========== BASELINE MODEL ==========
+                    if model_type == "Baseline (RF/SVM)" and BASELINE_AVAILABLE:
+                        model_code = "rf" if baseline_model_choice_str == "Random Forest" else "svm"
+                        pred_label, prob_list, classes = predict_scanner_baseline(
+                            temp_path, model_choice=model_code
+                        )
+
+                        # --- Use Tabs for results ---
+                        tab_scanner, _ = st.tabs(["Scanner Identification", "Tamper Detection"])
+
+                        with tab_scanner:
+                            st.metric("Predicted Scanner", pred_label)
+                            if len(prob_list) == len(classes):
+                                prob_df = pd.DataFrame({
+                                    'Class': classes,
+                                    'Confidence': [p * 100 for p in prob_list]
+                                })
+                                st.bar_chart(
+                                    prob_df.set_index('Class').sort_values('Confidence', ascending=False)
+                                )
+                            else:
+                                st.warning("⚠️ Probability/Class mismatch.")
+
+                    # ========== HYBRID FORENSICS ==========
+                    elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
+                        s_label, s_conf, all_probs_dict = None, None, {}
+
+                        # --- Scanner Prediction ---
+                        if FORENSICS_AVAILABLE:
+                            s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
+
+                            # --- Tamper Detection ---
+                            t_res = None
+                            if HAS_IMG:
+                                t_res = infer_tamper_image(temp_path)
+                                tamper_source = "Image-Level (18D)"
+                            elif HAS_PATCH:
+                                t_res = infer_tamper_single_patch(temp_path)
+                                tamper_source = "Patch Fallback (22D)"
+                            else:
+                                tamper_source = "Disabled"
+                        else:
+                            pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
+                            s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
+                            st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
+
+                        # --- Use Tabs for results ---
+                        tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
+
+                        with tab_scanner:
+                            st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
+                            if all_probs_dict:
+                                prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+                                prob_df['Confidence'] = prob_df['Probability'] * 100
+                                st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
+
+                        with tab_tamper:
+                            if FORENSICS_AVAILABLE and t_res:
+                                st.metric(
+                                    "Tamper Label", 
+                                    t_res["tamper_label"], 
+                                    delta=f"{t_res['confidence']:.1f}% Confidence",
+                                    delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+                                )
+                                st.caption(f"Method: {tamper_source}")
+                                st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}** (Threshold: {t_res['threshold']:.3f})")
+                                if t_res['hits'] != -1:
+                                    st.write(f"Patch Hits: **{t_res['hits']}**")
+                            else:
+                                st.info("Tamper detection is only available with Hybrid Forensics model.")
+
+            except Exception as e:
+                st.error(f"Prediction error: {e}")
+            finally:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+        else:
+            st.info("Upload an image to see the analysis.")
+
+
+
+
+# ===============================================================
+# ============= NEW: PROJECT PIPELINE WIZARD PAGE ===============
+# ===============================================================
+elif menu == "🛠️ Project Pipeline":
+    st.header("🛠️ Project Training Pipeline")
+    st.write("Follow these steps to preprocess data and train your models.")
+
+    # --- Define file paths for our checks ---
+    DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
+    RESIDUALS_PKL = os.path.join(ARTIFACTS_DIR, "official_wiki_residuals.pkl")
+    
+    BASELINE_FEAT_CSV = os.path.join(PROJECT_ROOT, "results", "metadata_features.csv")
+    BASELINE_MODEL_PKL = os.path.join(PROJECT_ROOT, "src", "models", "baseline", "models", "random_forest.pkl")
+    
+    CNN_FEAT_PKL = os.path.join(ARTIFACTS_DIR, "features_27dim.pkl")
+    CNN_MODEL_KERA = os.path.join(PROJECT_ROOT, "src", "models", "cnn", "models", "scanner_hybrid_best.keras")
+
+    # Get the python executable path
+    PYTHON_EXE = os.path.join(PROJECT_ROOT, "venv", "Scripts", "python.exe")
+
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "**Milestone 1: Preprocessing**", 
+        "**Milestone 2: Baseline Models**", 
+        "**Milestone 3: CNN Model**", 
+        "**Milestone 4: Deployment**"
+    ])
+
+    # --- TAB 1: PREPROCESSING ---
+    with tab1:
+        st.subheader("Step 1: Check Dataset")
+        
+        # Check 1: Do we have data?
+        if os.path.exists(DATA_DIR) and len(os.listdir(DATA_DIR)) > 0:
+            st.success(f"✅ Dataset found at `{DATA_DIR}`")
+        else:
+            st.error(f"❌ Dataset not found at `{DATA_DIR}`.")
+            st.info("Please add your 'Official' dataset folder with images.")
+
+        st.divider()
+        
+        st.subheader("Step 2: Run Image Preprocessing")
+        st.write("This will scan all images, extract noise residuals, and save them.")
+        
+        # Check 2: Are residuals already processed?
+        if os.path.exists(RESIDUALS_PKL):
+            st.success(f"✅ Preprocessing complete! Artifact found: `{RESIDUALS_PKL}`")
+        else:
+            st.warning("⚠️ Preprocessing has not been run.")
+
+        if st.button("Run Preprocessing"):
+            script_path = os.path.join(SRC_DIR, "preprocess", "cnn", "processing_cnn.py")
+            with st.spinner("Processing images... This may take several minutes."):
+                try:
+                    result = subprocess.run([PYTHON_EXE, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
+                    st.text(result.stdout)
+                    if result.stderr:
+                        st.warning(result.stderr)
+                    st.success("Preprocessing complete! Refresh to see status update.")
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Error during preprocessing: {e.stderr}")
+
+    # --- TAB 2: BASELINE MODELS ---
+    with tab2:
+        # Prerequisite check
+        if not os.path.exists(RESIDUALS_PKL):
+            st.warning("Please complete Milestone 1 first.")
+            st.stop()
+
+        st.subheader("Step 1: Extract Baseline Features")
+        
+        # Check 1: Are features extracted?
+        if os.path.exists(BASELINE_FEAT_CSV):
+            st.success(f"✅ Baseline features extracted! Artifact found: `{BASELINE_FEAT_CSV}`")
+            st.dataframe(pd.read_csv(BASELINE_FEAT_CSV).head())
+        else:
+            st.warning("⚠️ Baseline features have not been extracted.")
+
+        if st.button("Run Baseline Feature Extraction"):
+            script_path = os.path.join(SRC_DIR, "features", "baseline", "build_features.py")
+            with st.spinner("Extracting baseline features..."):
+                try:
+                    result = subprocess.run([PYTHON_EXE, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
+                    st.text(result.stdout)
+                    st.success("Baseline feature extraction complete!")
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Error during extraction: {e.stderr}")
+        
+        st.divider()
+        
+        st.subheader("Step 2: Train Baseline Models")
+
+        # Check 2: Are models trained?
+        if os.path.exists(BASELINE_MODEL_PKL):
+            st.success(f"✅ Baseline models trained! Artifact found: `{BASELINE_MODEL_PKL}`")
+        else:
+            st.warning("⚠️ Baseline models have not been trained.")
+        
+        if st.button("Train Baseline Models (RF & SVM)"):
+            script_path = os.path.join(SRC_DIR, "scripts", "training_baseline.py")
+            with st.spinner("Training baseline models..."):
+                try:
+                    result = subprocess.run([PYTHON_EXE, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
+                    st.text(result.stdout)
+                    st.success("Baseline training complete!")
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Error during training: {e.stderr}")
+
+    # --- TAB 3: CNN MODEL ---
+    with tab3:
+        # Prerequisite check
+        if not os.path.exists(RESIDUALS_PKL):
+            st.warning("Please complete Milestone 1 first.")
+            st.stop()
+
+        st.subheader("Step 1: Extract CNN Features (27-Dim)")
+        
+        # Check 1: Are features extracted?
+        if os.path.exists(CNN_FEAT_PKL):
+            st.success(f"✅ CNN features extracted! Artifact found: `{CNN_FEAT_PKL}`")
+        else:
+            st.warning("⚠️ CNN features have not been extracted.")
+
+        if st.button("Run CNN Feature Extraction (27-Dim)"):
+            script_path = os.path.join(SRC_DIR, "features", "cnn", "feature_extractor_cnn.py")
+            with st.spinner("Extracting CNN features... This may take a minute."):
+                try:
+                    result = subprocess.run([PYTHON_EXE, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
+                    st.text(result.stdout)
+                    st.success("CNN feature extraction complete!")
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Error during extraction: {e.stderr}")
+        
+        st.divider()
+        
+        st.subheader("Step 2: Train Hybrid CNN Model")
+
+        # Check 2: Are models trained?
+        if os.path.exists(CNN_MODEL_KERA):
+            st.success(f"✅ Hybrid CNN model trained! Artifact found: `{CNN_MODEL_KERA}`")
+        else:
+            st.warning("⚠️ Hybrid CNN model has not been trained.")
+        
+        if st.button("Train Hybrid CNN Model"):
+            st.warning("This may take a long time and requires a GPU for best results.")
+            script_path = os.path.join(SRC_DIR, "scripts", "train_hybrid_cnn.py")
+            with st.spinner("Training Hybrid CNN model..."):
+                try:
+                    result = subprocess.run([PYTHON_EXE, script_path], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT)
+                    st.text(result.stdout)
+                    st.success("Hybrid CNN training complete!")
+                except subprocess.CalledProcessError as e:
+                    st.error(f"Error during training: {e.stderr}")
+        
+        st.divider()
+        st.subheader("Step 3: Explainability (SHAP / Grad-CAM)")
+        st.info("This feature is not yet implemented. This step would run SHAP or Grad-CAM to generate visualizations.")
+
+    # --- TAB 4: DEPLOYMENT ---
+    with tab4:
+        st.header("✅ Your Application is Ready!")
+        st.info("You can now go to the '🚀 Predict Scanner' page in the sidebar to use your trained models.")
+        
+        if os.path.exists(CNN_MODEL_KERA):
+            st.success("Hybrid CNN Model is trained and ready.")
+        else:
+            st.warning("Hybrid CNN Model is not trained.")
+            
+        if os.path.exists(BASELINE_MODEL_PKL):
+            st.success("Baseline Models are trained and ready.")
+        else:
+            st.warning("Baseline Models are not trained.")
+
+
 
 
 # if menu == "Predict Scanner":
@@ -268,207 +576,92 @@ menu=st.sidebar.radio("Choose Action", menu_options, index=default_index, key="m
 #                     except OSError: pass
     
     
-#     # CNN/Hybrid Forensics Prediction (Updated Block)
+#     # CNN/Hybrid Forensics Prediction (Updated Block - FIX APPLIED)
 #     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
-#         st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
-#         uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
+#         # *** FIX: Wrap the entire block in st.container() to enforce rendering isolation ***
+#         with st.container():
+#             st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
+#             uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
 
-#         if uploaded_file_cnn is not None:
-#             with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
-#                 tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
+#             if uploaded_file_cnn is not None:
+#                 with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
+#                     tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
 
-#             try:
-#                 st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
+#                 try:
+#                     st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
 
-#                 # Optional: Set debug flag for sidebar output
-#                 st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
+#                     # Optional: Set debug flag for sidebar output
+#                     st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
 
-#                 with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
+#                     with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
 
-#                     # --- 1. Scanner Prediction (using the new module) ---
-#                     if FORENSICS_AVAILABLE:
-#                         s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
+#                         # --- 1. Scanner Prediction (using the new module) ---
+#                         if FORENSICS_AVAILABLE:
+#                             s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
 
-#                         # --- 2. Tamper Detection ---
-#                         t_res = None
-#                         if HAS_IMG:
-#                             t_res = infer_tamper_image(temp_path_cnn)
-#                             tamper_source = "Image-Level (18D)"
-#                         elif HAS_PATCH:
-#                             t_res = infer_tamper_single_patch(temp_path_cnn)
-#                             tamper_source = "Patch Fallback (22D)"
-#                         else:
-#                             tamper_source = "Disabled"
+#                             # --- 2. Tamper Detection ---
+#                             t_res = None
+#                             if HAS_IMG:
+#                                 t_res = infer_tamper_image(temp_path_cnn)
+#                                 tamper_source = "Image-Level (18D)"
+#                             elif HAS_PATCH:
+#                                 t_res = infer_tamper_single_patch(temp_path_cnn)
+#                                 tamper_source = "Patch Fallback (22D)"
+#                             else:
+#                                 tamper_source = "Disabled"
 
-#                     else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
-#                         pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
-#                         st.error("Tamper check artifacts missing. Showing only Scanner ID.")
+#                         else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
+#                             pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
+#                             st.error("Tamper check artifacts missing. Showing only Scanner ID.")
 
-#                 # --- Display Results ---
-#                 c1, c2 = st.columns(2)
+#                         # --- Display Results ---
+#                         c1, c2 = st.columns(2)
 
-#                 with c1:
-#                     st.markdown("### 🖼️ Scanner Identification")
-#                     st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
+#                         with c1:
+#                             st.markdown("### 🖼️ Scanner Identification")
+#                             st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
 
-#                     # Display all probabilities
-#                     if FORENSICS_AVAILABLE:
-#                         prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
-#                         prob_df['Confidence (%)'] = prob_df['Probability'] * 100
-#                         prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
-#                         prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-#                         st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
+#                             # Display all probabilities
+#                             if FORENSICS_AVAILABLE:
+#                                 prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+#                                 prob_df['Confidence (%)'] = prob_df['Probability'] * 100
+#                                 prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
+#                                 prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
+#                                 st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
 
-#                 if t_res:
-#                     with c2:
-#                         st.markdown("### 🚨 Tamper Detection")
-#                         st.metric(
-#                             "Tamper Label", 
-#                             t_res["tamper_label"], 
-#                             delta=f"{t_res['confidence']:.1f}% Confidence",
-#                             delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
-#                         )
-#                         st.markdown(f"**Method:** _{tamper_source}_")
-#                         st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
-#                         st.write(f"Threshold: **{t_res['threshold']:.3f}**")
-#                         if t_res['hits'] != -1:
-#                             st.write(f"Patch Hits: **{t_res['hits']}**")
+#                         if t_res:
+#                             with c2:
+#                                 st.markdown("### 🚨 Tamper Detection")
+#                                 st.metric(
+#                                     "Tamper Label", 
+#                                     t_res["tamper_label"], 
+#                                     delta=f"{t_res['confidence']:.1f}% Confidence",
+#                                     delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+#                                 )
+#                                 st.markdown(f"**Method:** _{tamper_source}_")
+#                                 st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
+#                                 st.write(f"Threshold: **{t_res['threshold']:.3f}**")
+#                                 if t_res['hits'] != -1:
+#                                     st.write(f"Patch Hits: **{t_res['hits']}**")
 
-#             except Exception as e: 
-#                 st.error(f"Hybrid Forensics error: {e}")
-#             finally:
-#                 if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
-#                     try: os.remove(temp_path_cnn)
-#                     except OSError: pass
-
-
-
-if menu == "Predict Scanner":
-    st.header("Upload Image to Identify Scanner Source")
-    available_model_types=[]
-    if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
-    # Update CNN label to reflect its new functionality
-    if FORENSICS_AVAILABLE: 
-        available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
-    elif CNN_AVAILABLE: 
-        available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
-
-    if not available_model_types: st.error("❌ No models loaded."); st.stop()
-    model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
-
-
-    # Baseline Prediction
-    if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
-        st.subheader("Baseline Prediction")
-        baseline_model_choice_str=st.selectbox("Algorithm",["Random Forest","SVM"],key="baseline_model_predict")
-        uploaded_file_base=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="baseline_uploader")
-        if uploaded_file_base is not None:
-            with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_base.name)[1]) as tmp_file_base:
-                tmp_file_base.write(uploaded_file_base.getvalue()); temp_path_baseline=tmp_file_base.name
-            try:
-                st.image(uploaded_file_base, caption="Uploaded", width=256) # FIX: Use uploaded file
-                with st.spinner("Analyzing (Baseline)..."):
-                    model_code="rf" if baseline_model_choice_str=="Random Forest" else "svm"
-                    pred_label, prob_list, classes=predict_scanner_baseline(temp_path_baseline, model_choice=model_code)
-                if pred_label is not None and prob_list is not None and classes is not None and len(classes)>0:
-                    st.success(f"🖼️ Prediction: **{pred_label}**")
-                    st.write("Probabilities:")
-                    if len(prob_list)==len(classes):
-                        prob_df=pd.DataFrame({'Class':classes,'Probability':prob_list}); prob_df['Confidence (%)']=prob_df['Probability']*100
-                        prob_df_display=prob_df[['Class','Confidence (%)']].copy(); prob_df_display['Confidence (%)']=prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-                        st.dataframe(prob_df_display.sort_values(by='Confidence (%)',ascending=False,key=lambda x:x.str.rstrip('%').astype(float)))
-                    else: st.warning("Prob/class mismatch.")
-                else: st.error("Baseline prediction failed.")
-            except FileNotFoundError as e: st.error(f"Baseline artifacts missing: {e}")
-            except Exception as e: st.error(f"Baseline prediction error: {e}")
-            finally:
-                if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
-                    try: os.remove(temp_path_baseline)
-                    except OSError: pass
-    
-    
-    # CNN/Hybrid Forensics Prediction (Updated Block - FIX APPLIED)
-    elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
-        # *** FIX: Wrap the entire block in st.container() to enforce rendering isolation ***
-        with st.container():
-            st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
-            uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
-
-            if uploaded_file_cnn is not None:
-                with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
-                    tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
-
-                try:
-                    st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
-
-                    # Optional: Set debug flag for sidebar output
-                    st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
-
-                    with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
-
-                        # --- 1. Scanner Prediction (using the new module) ---
-                        if FORENSICS_AVAILABLE:
-                            s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
-
-                            # --- 2. Tamper Detection ---
-                            t_res = None
-                            if HAS_IMG:
-                                t_res = infer_tamper_image(temp_path_cnn)
-                                tamper_source = "Image-Level (18D)"
-                            elif HAS_PATCH:
-                                t_res = infer_tamper_single_patch(temp_path_cnn)
-                                tamper_source = "Patch Fallback (22D)"
-                            else:
-                                tamper_source = "Disabled"
-
-                        else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
-                            pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
-                            st.error("Tamper check artifacts missing. Showing only Scanner ID.")
-
-                        # --- Display Results ---
-                        c1, c2 = st.columns(2)
-
-                        with c1:
-                            st.markdown("### 🖼️ Scanner Identification")
-                            st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
-
-                            # Display all probabilities
-                            if FORENSICS_AVAILABLE:
-                                prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
-                                prob_df['Confidence (%)'] = prob_df['Probability'] * 100
-                                prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
-                                prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-                                st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
-
-                        if t_res:
-                            with c2:
-                                st.markdown("### 🚨 Tamper Detection")
-                                st.metric(
-                                    "Tamper Label", 
-                                    t_res["tamper_label"], 
-                                    delta=f"{t_res['confidence']:.1f}% Confidence",
-                                    delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
-                                )
-                                st.markdown(f"**Method:** _{tamper_source}_")
-                                st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
-                                st.write(f"Threshold: **{t_res['threshold']:.3f}**")
-                                if t_res['hits'] != -1:
-                                    st.write(f"Patch Hits: **{t_res['hits']}**")
-
-                except Exception as e: 
-                    st.error(f"Hybrid Forensics error: {e}")
-                finally:
-                    if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
-                        try: os.remove(temp_path_cnn)
-                        except OSError: pass
+#                 except Exception as e: 
+#                     st.error(f"Hybrid Forensics error: {e}")
+#                 finally:
+#                     if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
+#                         try: os.remove(temp_path_cnn)
+#                         except OSError: pass
 
 
 
-elif menu == "📊 Dataset Visualization":
+
+# elif menu == "📊 Dataset Visualization":
+elif menu == "🖼️ Dataset Visualization":
     st.header("📊 Dataset Visualization Dashboard")
     st.write("View class distribution, random samples, and dataset statistics.")
 
     from scripts.visualize_data import get_image_data, get_dataset_summary
+    import random
+    from PIL import Image
 
     # === Cache the dataset scan ===
     @st.cache_data(show_spinner=False)
@@ -503,53 +696,208 @@ elif menu == "📊 Dataset Visualization":
 
     # --- Class Distribution ---
     st.subheader("📈 Class Distribution")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.barplot(
-        x="Class",
-        y="Image Count",
-        data=class_counts,
-        hue="Class",
-        dodge=False,
-        legend=False,
-        palette="viridis"
-    )
-    plt.xticks(rotation=90)
-    st.pyplot(fig)
-    plt.close(fig)
+    st.bar_chart(class_counts.set_index("Class")["Image Count"])  # ✅ Native, interactive bar chart
 
     # --- Random Samples ---
     st.subheader("🖼️ Sample Images from Each Class")
-    import random
-    from PIL import Image
-
     for class_name in class_counts["Class"]:
         subset = df[df["Class"] == class_name]
         if subset.empty:
             continue
+
         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
-        st.markdown(f"### 📁 {class_name} ({len(subset)} images)")
-        cols = st.columns(len(sample_paths))
-        for i, img_path in enumerate(sample_paths):
-            try:
-                img = Image.open(img_path)
-                cols[i].image(img, use_container_width=True)
-            except:
-                continue
+
+        # ✅ Use expander for cleaner UI
+        with st.expander(f"📁 {class_name} ({len(subset)} images)"):
+            cols = st.columns(len(sample_paths))
+            for i, img_path in enumerate(sample_paths):
+                try:
+                    img = Image.open(img_path)
+                    cols[i].image(img, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error loading image: {e}")
+                    continue
 
 
 
-elif menu=="Evaluate Baseline" and BASELINE_AVAILABLE:
-    st.header("Baseline Model Evaluation"); st.write("Results on test set.")
-    st.info("Ensure baseline training artifacts exist.")
-    rf_model_path=os.path.join(BASELINE_MODEL_DIR, "models", "random_forest.pkl")
-    if os.path.exists(rf_model_path): evaluate_baseline_model(rf_model_path,"Random Forest")
-    else: st.warning("RF model not found.")
-    st.divider()
-    svm_model_path=os.path.join(BASELINE_MODEL_DIR, "models", "svm.pkl")
-    if os.path.exists(svm_model_path): evaluate_baseline_model(svm_model_path,"SVM")
-    else: st.warning("SVM model not found.")    
 
-elif menu=="Train Baseline" and BASELINE_AVAILABLE:
+
+
+# elif menu == "📊 Dataset Visualization":
+#     st.header("📊 Dataset Visualization Dashboard")
+#     st.write("View class distribution, random samples, and dataset statistics.")
+
+#     from scripts.visualize_data import get_image_data, get_dataset_summary
+
+#     # === Cache the dataset scan ===
+#     @st.cache_data(show_spinner=False)
+#     def cached_get_image_data(base_dir):
+#         return get_image_data(base_dir)
+
+#     @st.cache_data(show_spinner=False)
+#     def cached_get_dataset_summary(base_dir):
+#         return get_dataset_summary(base_dir)
+
+#     DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
+
+#     if not os.path.exists(DATA_DIR):
+#         st.error(f"Dataset folder not found: {DATA_DIR}")
+#         st.stop()
+
+#     # Use cached function ✅
+#     with st.spinner("Analyzing dataset..."):
+#         df, class_counts, stats = cached_get_dataset_summary(DATA_DIR)
+
+#     if df is None:
+#         st.warning("No images found in dataset.")
+#         st.stop()
+
+#     # --- Summary Stats ---
+#     st.subheader("📦 Dataset Summary")
+#     c1, c2, c3, c4 = st.columns(4)
+#     c1.metric("Total Classes", stats["total_classes"])
+#     c2.metric("Total Images", stats["total_images"])
+#     c3.metric("Avg. Resolution", stats["avg_resolution"])
+#     c4.metric("Most Common Format", stats["common_format"])
+
+#     # --- Class Distribution ---
+#     st.subheader("📈 Class Distribution")
+#     fig, ax = plt.subplots(figsize=(10, 6))
+#     sns.barplot(
+#         x="Class",
+#         y="Image Count",
+#         data=class_counts,
+#         hue="Class",
+#         dodge=False,
+#         legend=False,
+#         palette="viridis"
+#     )
+#     plt.xticks(rotation=90)
+#     st.pyplot(fig)
+#     plt.close(fig)
+
+#     # --- Random Samples ---
+#     st.subheader("🖼️ Sample Images from Each Class")
+#     import random
+#     from PIL import Image
+
+#     for class_name in class_counts["Class"]:
+#         subset = df[df["Class"] == class_name]
+#         if subset.empty:
+#             continue
+#         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
+#         st.markdown(f"### 📁 {class_name} ({len(subset)} images)")
+#         cols = st.columns(len(sample_paths))
+#         for i, img_path in enumerate(sample_paths):
+#             try:
+#                 img = Image.open(img_path)
+#                 cols[i].image(img, use_container_width=True)
+#             except:
+#                 continue
+
+
+
+
+# === EVALUATION PAGE (Unified for Baseline + CNN) ===
+elif (menu == "📊 Evaluate Baseline" and BASELINE_AVAILABLE) or (menu == "📈 Evaluate CNN" and CNN_AVAILABLE):
+    st.header("📊 Model Evaluation Dashboard")
+
+    # --- Define paths (for CNN section) ---
+    cnn_cm_path = os.path.join(RESULTS_DIR, "cnn_confusion_matrix_27dim.png")
+    cnn_report_path = os.path.join(RESULTS_DIR, "cnn_classification_report.json")
+
+    # --- Tabs for Baseline & CNN ---
+    tab_baseline, tab_cnn = st.tabs(["🧩 Baseline (RF & SVM)", "🧠 Hybrid CNN"])
+
+    # ===============================================================
+    # ================= BASELINE EVALUATION TAB =====================
+    # ===============================================================
+    with tab_baseline:
+        st.subheader("Baseline Model Evaluation (Test Set)")
+        st.info("Ensure baseline training artifacts exist before evaluating.")
+
+        rf_model_path = os.path.join(BASELINE_MODEL_DIR, "models", "random_forest.pkl")
+        svm_model_path = os.path.join(BASELINE_MODEL_DIR, "models", "svm.pkl")
+
+        # --- Random Forest Evaluation ---
+        with st.container(border=True):
+            st.markdown("### 🌲 Random Forest Evaluation")
+            if os.path.exists(rf_model_path):
+                try:
+                    evaluate_baseline_model(rf_model_path, "Random Forest")
+                except Exception as e:
+                    st.error(f"RF Evaluation Error: {e}")
+            else:
+                st.warning("RF model not found.")
+
+        st.divider()
+
+        # --- SVM Evaluation ---
+        with st.container(border=True):
+            st.markdown("### ⚙️ SVM Evaluation")
+            if os.path.exists(svm_model_path):
+                try:
+                    evaluate_baseline_model(svm_model_path, "SVM")
+                except Exception as e:
+                    st.error(f"SVM Evaluation Error: {e}")
+            else:
+                st.warning("SVM model not found.")
+
+    # ===============================================================
+    # ==================== CNN EVALUATION TAB =======================
+    # ===============================================================
+    with tab_cnn:
+        st.subheader("Hybrid CNN Model Evaluation (27-Dim)")
+
+        # --- 1. Classification Report ---
+        with st.expander("📋 Classification Report", expanded=True):
+            if os.path.exists(cnn_report_path):
+                try:
+                    with open(cnn_report_path, 'r') as f:
+                        report_dict = json.load(f)
+
+                    # Display both JSON and formatted DataFrame
+                    st.json(report_dict)
+
+                    df_report = pd.DataFrame(report_dict).transpose()
+                    if 'support' in df_report.columns:
+                        df_report['support'] = df_report['support'].astype(float).astype(int)
+
+                    st.markdown("#### 📑 Detailed Metrics")
+                    st.dataframe(df_report.style.highlight_max(axis=0, color='lightgreen'))
+                except Exception as e:
+                    st.error(f"Error loading classification report: {e}")
+            else:
+                st.warning("Classification report (`cnn_classification_report.json`) not found.")
+                st.info("You must run the evaluation script first to generate the report:")
+                st.code("python src/scripts/eval_hybrid_cnn.py", language="bash")
+
+        # --- 2. Confusion Matrix ---
+        with st.expander("📉 Confusion Matrix", expanded=True):
+            if os.path.exists(cnn_cm_path):
+                st.image(cnn_cm_path, caption="CNN Confusion Matrix (27 Feat)", use_container_width=True)
+            else:
+                st.warning("Confusion matrix (`cnn_confusion_matrix_27dim.png`) not found.")
+                st.info("Run the evaluation script to generate this image.")
+
+
+
+
+
+# elif menu=="Evaluate Baseline" and BASELINE_AVAILABLE:
+#     st.header("Baseline Model Evaluation"); st.write("Results on test set.")
+#     st.info("Ensure baseline training artifacts exist.")
+#     rf_model_path=os.path.join(BASELINE_MODEL_DIR, "models", "random_forest.pkl")
+#     if os.path.exists(rf_model_path): evaluate_baseline_model(rf_model_path,"Random Forest")
+#     else: st.warning("RF model not found.")
+#     st.divider()
+#     svm_model_path=os.path.join(BASELINE_MODEL_DIR, "models", "svm.pkl")
+#     if os.path.exists(svm_model_path): evaluate_baseline_model(svm_model_path,"SVM")
+#     else: st.warning("SVM model not found.")    
+
+
+# elif menu=="Train Baseline" and BASELINE_AVAILABLE:
+elif menu=="⚙️ Train Baseline" and BASELINE_AVAILABLE:
     st.header("Train Baseline Models"); st.write(f"Uses: `{os.path.relpath(BASELINE_FEATURES_CSV, PROJECT_ROOT)}`")
     st.warning("Overwrites existing artifacts in `src/models/baseline/` and `artifacts/`.")
     if st.button("Start Baseline Training",key="train_baseline_button"):
@@ -573,51 +921,55 @@ elif menu=="Train Baseline" and BASELINE_AVAILABLE:
                 except Exception as e: 
                     st.error(f"Baseline train error: {e}")
 
-elif menu=="Explore Baseline Features" and BASELINE_AVAILABLE: baseline_feature_explorer()
+# elif menu=="Explore Baseline Features" and BASELINE_AVAILABLE: 
+elif menu=="🔍 Explore Baseline Features" and BASELINE_AVAILABLE:
+    baseline_feature_explorer()
 
-elif menu == "Evaluate CNN" and CNN_AVAILABLE:
-    st.header("CNN Model Evaluation")
+# elif menu == "Evaluate CNN" and CNN_AVAILABLE:
+#     st.header("CNN Model Evaluation")
 
-    # --- Define paths ---
-    cnn_cm_path = os.path.join(RESULTS_DIR, "cnn_confusion_matrix_27dim.png")
-    cnn_report_path = os.path.join(RESULTS_DIR, "cnn_classification_report.json")
+#     # --- Define paths ---
+#     cnn_cm_path = os.path.join(RESULTS_DIR, "cnn_confusion_matrix_27dim.png")
+#     cnn_report_path = os.path.join(RESULTS_DIR, "cnn_classification_report.json")
 
-    # --- 1. Display Classification Report ---
-    st.subheader("Classification Report")
+#     # --- 1. Display Classification Report ---
+#     st.subheader("Classification Report")
     
-    if os.path.exists(cnn_report_path):
-        try:
-            # Load the saved JSON report
-            with open(cnn_report_path, 'r') as f:
-                report_dict = json.load(f)
+#     if os.path.exists(cnn_report_path):
+#         try:
+#             # Load the saved JSON report
+#             with open(cnn_report_path, 'r') as f:
+#                 report_dict = json.load(f)
             
-            # Convert it to a Pandas DataFrame
-            df_report = pd.DataFrame(report_dict).transpose()
+#             # Convert it to a Pandas DataFrame
+#             df_report = pd.DataFrame(report_dict).transpose()
             
-            # Format the 'support' column to be a clean integer
-            if 'support' in df_report.columns:
-                 df_report['support'] = df_report['support'].astype(float).astype(int)
+#             # Format the 'support' column to be a clean integer
+#             if 'support' in df_report.columns:
+#                  df_report['support'] = df_report['support'].astype(float).astype(int)
             
-            # Display the DataFrame as a nice table
-            st.dataframe(df_report)
+#             # Display the DataFrame as a nice table
+#             st.dataframe(df_report)
             
-        except Exception as e:
-            st.error(f"Error loading classification report: {e}")
-    else:
-        st.warning("Classification report (`cnn_classification_report.json`) not found.")
-        st.info("You must run the evaluation script first to generate the report:")
-        st.code("python src/scripts/eval_hybrid_cnn.py", language="bash")
+#         except Exception as e:
+#             st.error(f"Error loading classification report: {e}")
+#     else:
+#         st.warning("Classification report (`cnn_classification_report.json`) not found.")
+#         st.info("You must run the evaluation script first to generate the report:")
+#         st.code("python src/scripts/eval_hybrid_cnn.py", language="bash")
 
-    # --- 2. Display Confusion Matrix ---
-    st.subheader("Confusion Matrix")
+#     # --- 2. Display Confusion Matrix ---
+#     st.subheader("Confusion Matrix")
     
-    if os.path.exists(cnn_cm_path):
-        st.image(cnn_cm_path, caption="CNN Confusion Matrix (27 Feat)")
-    else:
-        st.warning("Confusion matrix (`cnn_confusion_matrix_27dim.png`) not found.")
-        st.info("Run the evaluation script to generate this image.")
+#     if os.path.exists(cnn_cm_path):
+#         st.image(cnn_cm_path, caption="CNN Confusion Matrix (27 Feat)")
+#     else:
+#         st.warning("Confusion matrix (`cnn_confusion_matrix_27dim.png`) not found.")
+#         st.info("Run the evaluation script to generate this image.")
 
-elif menu=="Train CNN" and CNN_AVAILABLE:
+
+# elif menu=="Train CNN" and CNN_AVAILABLE:
+elif menu=="🧠 Train CNN" and CNN_AVAILABLE:
     st.header("Train CNN Model Info"); 
     st.warning("⚠️ Run from terminal (long, GPU recommended).")
     # --- FIX: Use raw string for path ---
