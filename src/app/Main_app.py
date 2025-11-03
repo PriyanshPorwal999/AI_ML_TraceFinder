@@ -12,6 +12,7 @@ import time
 from PIL import Image # For displaying uploaded image
 import subprocess # For running scripts
 import json
+import cv2
 
 # --- Path Setup ---
 # This file is in src/app/
@@ -32,7 +33,8 @@ try:
         predict_scanner_hybrid_forensics, 
         infer_tamper_image, 
         infer_tamper_single_patch,
-        FORENSICS_AVAILABLE, HAS_IMG, HAS_PATCH # Use these flags
+        FORENSICS_AVAILABLE, HAS_IMG, HAS_PATCH, # Use these flags
+        preprocess_residual_pywt
     )
     print("✅ Forensics module imported successfully.")
 except ImportError as e:
@@ -202,6 +204,7 @@ menu = st.sidebar.radio(
 
 
 
+
 # === PREDICT SCANNER PAGE ===
 if menu == "🚀 Predict Scanner":
     st.header("Upload Image to Identify Scanner Source")
@@ -254,20 +257,37 @@ if menu == "🚀 Predict Scanner":
         if uploaded_file is not None:
             st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
 
+            # =======================================================
+            # === NEW SECTION: Show Noise Residual Map (Expander) ===
+            # =======================================================
+            with st.expander("Show Noise Residual Map"):
+                try:
+                    # Create temp file here (shared between both columns)
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=os.path.splitext(uploaded_file.name)[1]
+                    ) as tmp_file:
+                        tmp_file.write(uploaded_file.getvalue())
+                        temp_path = tmp_file.name
+
+                    # Generate and display residual map
+                    with st.spinner("Generating noise map..."):
+                        residual_image = preprocess_residual_pywt(temp_path)
+                        residual_display = cv2.normalize(residual_image, None, 0, 1, cv2.NORM_MINMAX)
+                        # st.image(residual_display, caption="Scanner Noise Residual", use_container_width=True)
+                        st.image(residual_display, caption="Scanner Noise Residual", use_container_width=True, clamp=True)
+
+                except Exception as e:
+                    st.error(f"Could not generate noise map: {e}")
+        else:
+            temp_path = None  # fallback if not uploaded
+
     # ===============================================================
     # ============ RIGHT COLUMN - ANALYSIS RESULTS ==================
     # ===============================================================
     with col_results:
         st.subheader("Analysis Results")
 
-        if uploaded_file is not None:
-            # --- Create temp file ---
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=os.path.splitext(uploaded_file.name)[1]
-            ) as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
-                temp_path = tmp_file.name
-
+        if uploaded_file is not None and temp_path:
             try:
                 with st.spinner("Analyzing..."):
 
@@ -278,9 +298,8 @@ if menu == "🚀 Predict Scanner":
                             temp_path, model_choice=model_code
                         )
 
-                        # --- Use Tabs for results ---
+                        # --- Tabs for results ---
                         tab_scanner, _ = st.tabs(["Scanner Identification", "Tamper Detection"])
-
                         with tab_scanner:
                             st.metric("Predicted Scanner", pred_label)
                             if len(prob_list) == len(classes):
@@ -317,7 +336,7 @@ if menu == "🚀 Predict Scanner":
                             s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
                             st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
 
-                        # --- Use Tabs for results ---
+                        # --- Tabs for results ---
                         tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
 
                         with tab_scanner:
@@ -352,6 +371,162 @@ if menu == "🚀 Predict Scanner":
                         pass
         else:
             st.info("Upload an image to see the analysis.")
+
+
+
+
+
+
+# # === PREDICT SCANNER PAGE ===
+# if menu == "🚀 Predict Scanner":
+#     st.header("Upload Image to Identify Scanner Source")
+
+#     # --- Collect available models dynamically ---
+#     available_model_types = []
+#     if BASELINE_AVAILABLE:
+#         available_model_types.append("Baseline (RF/SVM)")
+#     if FORENSICS_AVAILABLE:
+#         available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
+#     elif CNN_AVAILABLE:
+#         available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
+
+#     if not available_model_types:
+#         st.error("❌ No models loaded.")
+#         st.stop()
+
+#     # --- Stylish segmented model selector ---
+#     model_type = st.segmented_control(
+#         "Select Model Type",
+#         available_model_types,
+#         key="predict_model_type"
+#     )
+
+#     # --- Two-column layout ---
+#     col_input, col_results = st.columns(2)
+
+#     # ===============================================================
+#     # ============ LEFT COLUMN - IMAGE INPUT SECTION ================
+#     # ===============================================================
+#     with col_input:
+#         st.subheader("Your Image")
+#         with st.container(border=True):
+#             if model_type == "Baseline (RF/SVM)":
+#                 baseline_model_choice_str = st.selectbox(
+#                     "Algorithm", ["Random Forest", "SVM"], key="baseline_model_predict"
+#                 )
+#                 uploaded_file = st.file_uploader(
+#                     "Upload a scanned image", 
+#                     type=["tif", "tiff", "jpg", "png", "jpeg"], 
+#                     key="baseline_uploader"
+#                 )
+#             else:
+#                 uploaded_file = st.file_uploader(
+#                     "Upload a scanned image", 
+#                     type=["tif", "tiff", "jpg", "png", "jpeg"], 
+#                     key="cnn_uploader"
+#                 )
+
+#         if uploaded_file is not None:
+#             st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
+
+#     # ===============================================================
+#     # ============ RIGHT COLUMN - ANALYSIS RESULTS ==================
+#     # ===============================================================
+#     with col_results:
+#         st.subheader("Analysis Results")
+
+#         if uploaded_file is not None:
+#             # --- Create temp file ---
+#             with tempfile.NamedTemporaryFile(
+#                 delete=False, suffix=os.path.splitext(uploaded_file.name)[1]
+#             ) as tmp_file:
+#                 tmp_file.write(uploaded_file.getvalue())
+#                 temp_path = tmp_file.name
+
+#             try:
+#                 with st.spinner("Analyzing..."):
+
+#                     # ========== BASELINE MODEL ==========
+#                     if model_type == "Baseline (RF/SVM)" and BASELINE_AVAILABLE:
+#                         model_code = "rf" if baseline_model_choice_str == "Random Forest" else "svm"
+#                         pred_label, prob_list, classes = predict_scanner_baseline(
+#                             temp_path, model_choice=model_code
+#                         )
+
+#                         # --- Use Tabs for results ---
+#                         tab_scanner, _ = st.tabs(["Scanner Identification", "Tamper Detection"])
+
+#                         with tab_scanner:
+#                             st.metric("Predicted Scanner", pred_label)
+#                             if len(prob_list) == len(classes):
+#                                 prob_df = pd.DataFrame({
+#                                     'Class': classes,
+#                                     'Confidence': [p * 100 for p in prob_list]
+#                                 })
+#                                 st.bar_chart(
+#                                     prob_df.set_index('Class').sort_values('Confidence', ascending=False)
+#                                 )
+#                             else:
+#                                 st.warning("⚠️ Probability/Class mismatch.")
+
+#                     # ========== HYBRID FORENSICS ==========
+#                     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
+#                         s_label, s_conf, all_probs_dict = None, None, {}
+
+#                         # --- Scanner Prediction ---
+#                         if FORENSICS_AVAILABLE:
+#                             s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
+
+#                             # --- Tamper Detection ---
+#                             t_res = None
+#                             if HAS_IMG:
+#                                 t_res = infer_tamper_image(temp_path)
+#                                 tamper_source = "Image-Level (18D)"
+#                             elif HAS_PATCH:
+#                                 t_res = infer_tamper_single_patch(temp_path)
+#                                 tamper_source = "Patch Fallback (22D)"
+#                             else:
+#                                 tamper_source = "Disabled"
+#                         else:
+#                             pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
+#                             s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
+#                             st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
+
+#                         # --- Use Tabs for results ---
+#                         tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
+
+#                         with tab_scanner:
+#                             st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
+#                             if all_probs_dict:
+#                                 prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
+#                                 prob_df['Confidence'] = prob_df['Probability'] * 100
+#                                 st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
+
+#                         with tab_tamper:
+#                             if FORENSICS_AVAILABLE and t_res:
+#                                 st.metric(
+#                                     "Tamper Label", 
+#                                     t_res["tamper_label"], 
+#                                     delta=f"{t_res['confidence']:.1f}% Confidence",
+#                                     delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
+#                                 )
+#                                 st.caption(f"Method: {tamper_source}")
+#                                 st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}** (Threshold: {t_res['threshold']:.3f})")
+#                                 if t_res['hits'] != -1:
+#                                     st.write(f"Patch Hits: **{t_res['hits']}**")
+#                             else:
+#                                 st.info("Tamper detection is only available with Hybrid Forensics model.")
+
+#             except Exception as e:
+#                 st.error(f"Prediction error: {e}")
+#             finally:
+#                 if os.path.exists(temp_path):
+#                     try:
+#                         os.remove(temp_path)
+#                     except OSError:
+#                         pass
+#         else:
+#             st.info("Upload an image to see the analysis.")
 
 
 
@@ -654,7 +829,8 @@ elif menu == "🛠️ Project Pipeline":
 
 
 
-# elif menu == "📊 Dataset Visualization":
+
+# === DATASET VISUALIZATION PAGE ===
 elif menu == "🖼️ Dataset Visualization":
     st.header("📊 Dataset Visualization Dashboard")
     st.write("View class distribution, random samples, and dataset statistics.")
@@ -696,7 +872,7 @@ elif menu == "🖼️ Dataset Visualization":
 
     # --- Class Distribution ---
     st.subheader("📈 Class Distribution")
-    st.bar_chart(class_counts.set_index("Class")["Image Count"])  # ✅ Native, interactive bar chart
+    st.bar_chart(class_counts.set_index("Class")["Image Count"])
 
     # --- Random Samples ---
     st.subheader("🖼️ Sample Images from Each Class")
@@ -717,6 +893,94 @@ elif menu == "🖼️ Dataset Visualization":
                 except Exception as e:
                     st.error(f"Error loading image: {e}")
                     continue
+
+            # ===================================================
+            # === NEW SECTION: Noise Map Generation Button =======
+            # ===================================================
+            st.divider()
+            if st.button(f"Generate Noise Map for {class_name}", key=f"noise_map_{class_name}"):
+                with st.spinner("Generating sample noise map..."):
+                    try:
+                        # Use first sample image from this class
+                        residual_image = preprocess_residual_pywt(sample_paths[0])
+                        residual_display = cv2.normalize(residual_image, None, 0, 1, cv2.NORM_MINMAX)
+                        st.image(
+                            residual_display,
+                            caption=f"Noise Map for {class_name}",
+                            use_container_width=True,
+                            clamp=True
+                        )
+                    except Exception as e:
+                        st.error(f"Error generating noise map: {e}")
+
+
+
+
+
+
+# # elif menu == "📊 Dataset Visualization":
+# elif menu == "🖼️ Dataset Visualization":
+#     st.header("📊 Dataset Visualization Dashboard")
+#     st.write("View class distribution, random samples, and dataset statistics.")
+
+#     from scripts.visualize_data import get_image_data, get_dataset_summary
+#     import random
+#     from PIL import Image
+
+#     # === Cache the dataset scan ===
+#     @st.cache_data(show_spinner=False)
+#     def cached_get_image_data(base_dir):
+#         return get_image_data(base_dir)
+
+#     @st.cache_data(show_spinner=False)
+#     def cached_get_dataset_summary(base_dir):
+#         return get_dataset_summary(base_dir)
+
+#     DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
+
+#     if not os.path.exists(DATA_DIR):
+#         st.error(f"Dataset folder not found: {DATA_DIR}")
+#         st.stop()
+
+#     # Use cached function ✅
+#     with st.spinner("Analyzing dataset..."):
+#         df, class_counts, stats = cached_get_dataset_summary(DATA_DIR)
+
+#     if df is None:
+#         st.warning("No images found in dataset.")
+#         st.stop()
+
+#     # --- Summary Stats ---
+#     st.subheader("📦 Dataset Summary")
+#     c1, c2, c3, c4 = st.columns(4)
+#     c1.metric("Total Classes", stats["total_classes"])
+#     c2.metric("Total Images", stats["total_images"])
+#     c3.metric("Avg. Resolution", stats["avg_resolution"])
+#     c4.metric("Most Common Format", stats["common_format"])
+
+#     # --- Class Distribution ---
+#     st.subheader("📈 Class Distribution")
+#     st.bar_chart(class_counts.set_index("Class")["Image Count"])  # ✅ Native, interactive bar chart
+
+#     # --- Random Samples ---
+#     st.subheader("🖼️ Sample Images from Each Class")
+#     for class_name in class_counts["Class"]:
+#         subset = df[df["Class"] == class_name]
+#         if subset.empty:
+#             continue
+
+#         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
+
+#         # ✅ Use expander for cleaner UI
+#         with st.expander(f"📁 {class_name} ({len(subset)} images)"):
+#             cols = st.columns(len(sample_paths))
+#             for i, img_path in enumerate(sample_paths):
+#                 try:
+#                     img = Image.open(img_path)
+#                     cols[i].image(img, use_container_width=True)
+#                 except Exception as e:
+#                     st.error(f"Error loading image: {e}")
+#                     continue
 
 
 
