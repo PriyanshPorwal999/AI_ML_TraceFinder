@@ -225,7 +225,7 @@ img:hover {
 # --- Sidebar ---
 st.sidebar.title("Navigation")
 # --- Base menu ---
-menu_options = ["🚀 Predict Scanner", "🛠️ Project Pipeline"]
+menu_options = ["🚀 Predict Scanner", "🛠️ Project Pipeline", "🔬 Forensic Comparison"]
 # --- Conditional menu items ---
 if BASELINE_AVAILABLE:
     menu_options.extend([
@@ -707,6 +707,119 @@ elif menu == "🛠️ Project Pipeline":
             st.warning("Baseline Models are not trained.")
 
 
+
+# ===============================================================
+# ============= NEW: FORENSIC COMPARISON PAGE ===================
+# ===============================================================
+elif menu == "🔬 Forensic Comparison":
+    st.header("🔬 Forensic Comparison & Analysis")
+    st.write("Upload an image to generate and compare its forensic fingerprints against the known library.")
+
+    # --- 1. File Uploader ---
+    uploaded_file = st.file_uploader(
+        "Upload a scanned image for forensic analysis", 
+        type=["tif", "tiff", "jpg", "png", "jpeg"], 
+        key="forensic_uploader"
+    )
+
+    if uploaded_file is not None:
+        # --- 2. Setup ---
+        # Create temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            temp_path = tmp_file.name
+        
+        # Import necessary functions and models
+        from scripts.predict_forensics import (
+            hyb_model, make_scanner_feats_from_res, 
+            scanner_fps, fp_keys, predict_scanner_hybrid_forensics
+        )
+        from scripts.explainability import generate_fft_spectrum, get_fingerprint_correlation
+
+        try:
+            # --- 3. Generate Core Artifacts ---
+            with st.spinner("Generating forensic artifacts..."):
+                # A. Generate the 2D residual map
+                residual_image = preprocess_residual_pywt(temp_path)
+                residual_display = cv2.normalize(residual_image, None, 0, 1, cv2.NORM_MINMAX)
+                
+                # B. Generate the FFT Spectrum
+                fft_spectrum_display = generate_fft_spectrum(residual_image)
+                
+                # C. Get direct correlation scores (Objective 2)
+                correlation_df = get_fingerprint_correlation(residual_image, scanner_fps, fp_keys)
+                
+                # D. Get the full model prediction
+                s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
+
+            # --- 4. Display Visualizations in Tabs ---
+            st.subheader("Analysis Results")
+            
+            tab1, tab2, tab3 = st.tabs([
+                "Visual Fingerprints (Residual & FFT)", 
+                "Direct Similarity Comparison", 
+                "Model Explainability (Grad-CAM)"
+            ])
+
+            # TAB 1: Visual Fingerprints
+            with tab1:
+                st.subheader("Generated Fingerprint Maps")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.image(temp_path, caption="Original Uploaded Image", use_container_width=True)
+                with col2:
+                    st.image(residual_display, caption="Noise Residual Map", use_container_width=True, clamp=True)
+                
+                st.divider()
+                st.subheader("Frequency Spectrum")
+                st.image(fft_spectrum_display, caption="FFT Log-Magnitude Spectrum", use_container_width=True, clamp=True)
+
+            # TAB 2: Direct Similarity Comparison
+            with tab2:
+                st.subheader("Direct Fingerprint Similarity")
+                st.write("This chart shows the direct correlation (cosine similarity) between the uploaded image's residual and the stored 'master' fingerprints.")
+                
+                st.bar_chart(correlation_df.set_index('Scanner'))
+                
+                with st.expander("Show Raw Similarity Scores"):
+                    st.dataframe(correlation_df)
+
+            # TAB 3: Model Explainability (Grad-CAM)
+            with tab3:
+                st.subheader("Model Decision Visualization (Grad-CAM)")
+                st.metric("Final Prediction (from Hybrid CNN)", s_label, f"{s_conf:.2f}% Confidence")
+                st.caption("This heatmap shows what the full AI model focused on to make its final prediction.")
+
+                with st.spinner("Generating Grad-CAM..."):
+                    # Get inputs for Grad-CAM
+                    x_img = np.expand_dims(residual_image, axis=(0, -1)).astype(np.float32)
+                    x_feat = make_scanner_feats_from_res(residual_image)
+                    possible_layer_names = ["last_conv_layer", "conv2d_13"] # The list of names
+                    
+                    # Generate heatmap
+                    heatmap = make_gradcam_heatmap(x_img, x_feat, hyb_model, possible_layer_names)
+                    
+                    # Superimpose
+                    superimposed_img, heatmap_img = get_superimposed_image(temp_path, heatmap, alpha=0.5)
+                    
+                    st.image(superimposed_img, caption="Grad-CAM Superimposed on Original Image", use_container_width=True)
+                    with st.expander("Show Raw Heatmap"):
+                        st.image(heatmap_img, caption="Raw Heatmap", use_container_width=True)
+
+        except Exception as e:
+            st.error(f"An error occurred during forensic analysis: {e}")
+            st.exception(e)
+        finally:
+            # Clean up the temp file
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+    else:
+        st.info("Upload an image to begin the forensic comparison.")
 
 
 # === DATASET VISUALIZATION PAGE ===
