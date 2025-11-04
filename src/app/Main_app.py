@@ -15,6 +15,7 @@ import json
 import cv2
 import pickle
 
+
 # --- Path Setup ---
 # This file is in src/app/
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,6 +42,8 @@ try:
     print("✅ Forensics module imported successfully.")
     from scripts.explainability import make_gradcam_heatmap, get_superimposed_image
     print("✅ Explainability modules imported successfully.")
+    from scripts.reporting import generate_pdf_report
+    print("✅ Report modules imported successfully.")
 
 except ImportError as e:
     print(f"⚠️ Warning: Could not load forensics components: {e}.")
@@ -165,7 +168,60 @@ def baseline_feature_explorer():
 
 # === STREAMLIT UI ===
 st.set_page_config(page_title="AI TraceFinder", layout="wide")
-st.title("📊 AI TraceFinder - Scanner Identification")
+# st.title("📊 AI TraceFinder - Scanner Identification")
+LOGO_PATH = os.path.join(PROJECT_ROOT, "img", "logo.png")
+
+
+
+col1, col2, col3 = st.columns([1, 3, 1])
+with col2:
+    st.image(LOGO_PATH, width=1600)
+
+# Custom CSS for styling all images
+st.markdown("""
+<style>
+img {
+    height: 450px !important;              /* Force custom height */
+    opacity: 1;                          /* Make it slightly transparent */
+    filter: brightness(1.1) contrast(1.05);/* Increase brightness and contrast */
+    border-radius: 15px;                   /* Rounded corners */
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4); /* Soft glow */
+    transition: all 0.5s ease-in-out;      /* Smooth hover transition */
+}
+img:hover {
+    opacity: 1;                            /* Full brightness on hover */
+    transform: scale(1.03);                /* Slight zoom on hover */
+    filter: brightness(1.3);
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+
+
+# st.write("Logo path:", LOGO_PATH)
+# st.write("File exists:", os.path.exists(LOGO_PATH))
+
+# # Custom HTML + CSS logo block
+# st.markdown(f"""
+#     <div style='text-align: center; margin-top: -40px;'>
+#         <img src="file:///{LOGO_PATH.replace("\\", "/")}"  
+#              style="
+#                 width: 500px;                /* Change width */
+#                 height: 500px;               /* Change height */
+#                 border-radius: 1%;          /* Makes it circular */
+#                 object-fit: cover;           /* Keeps proportions */
+#                 box-shadow: 0px 0px 10px rgba(0,255,255,0.4); /* Soft glow */
+#              ">
+#     </div>
+# """, unsafe_allow_html=True)
+
+
+# col1, col2, col3 = st.columns([1, 6, 1])
+# with col2:
+#     st.image(LOGO_PATH, use_column_width=True)
+
+
 # --- Sidebar ---
 st.sidebar.title("Navigation")
 # --- Base menu ---
@@ -429,55 +485,40 @@ if menu == "🚀 Predict Scanner":
                                         st.error(f"Could not generate Grad-CAM: {e}")
                                         st.exception(e)
 
+                        # ... (This is the end of your 'with tab_explain:' block) ...
+                                
+                    # --- ADD THIS NEW SECTION for PDF Report ---
+                    st.divider()
+                    st.subheader("📥 Download Report")
+                    
+                    try:
+                        # 1. Create data for the report
+                        # We need to re-generate the residual image
+                        residual_image_for_pdf = preprocess_residual_pywt(temp_path)
 
-
-        #             # ========== HYBRID FORENSICS ==========
-        #             elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
-        #                 s_label, s_conf, all_probs_dict = None, None, {}
-
-        #                 # --- Scanner Prediction ---
-        #                 if FORENSICS_AVAILABLE:
-        #                     s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
-
-        #                     # --- Tamper Detection ---
-        #                     t_res = None
-        #                     if HAS_IMG:
-        #                         t_res = infer_tamper_image(temp_path)
-        #                         tamper_source = "Image-Level (18D)"
-        #                     elif HAS_PATCH:
-        #                         t_res = infer_tamper_single_patch(temp_path)
-        #                         tamper_source = "Patch Fallback (22D)"
-        #                     else:
-        #                         tamper_source = "Disabled"
-        #                 else:
-        #                     pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
-        #                     s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
-        #                     st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
-
-        #                 # --- Tabs for results ---
-        #                 tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
-
-        #                 with tab_scanner:
-        #                     st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
-        #                     if all_probs_dict:
-        #                         prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
-        #                         prob_df['Confidence'] = prob_df['Probability'] * 100
-        #                         st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
-
-        #                 with tab_tamper:
-        #                     if FORENSICS_AVAILABLE and t_res:
-        #                         st.metric(
-        #                             "Tamper Label", 
-        #                             t_res["tamper_label"], 
-        #                             delta=f"{t_res['confidence']:.1f}% Confidence",
-        #                             delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
-        #                         )
-        #                         st.caption(f"Method: {tamper_source}")
-        #                         st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}** (Threshold: {t_res['threshold']:.3f})")
-        #                         if t_res['hits'] != -1:
-        #                             st.write(f"Patch Hits: **{t_res['hits']}**")
-        #                     else:
-        #                         st.info("Tamper detection is only available with Hybrid Forensics model.")
+                        report_data = {
+                            "image_path": temp_path,
+                            "residual_image": residual_image_for_pdf,
+                            "scanner_prediction": s_label,
+                            "scanner_confidence": s_conf,
+                            "tamper_label": t_res["tamper_label"] if t_res else "N/A",
+                            "tamper_confidence": t_res["confidence"] if t_res else 0.0,
+                            "probabilities": all_probs_dict
+                        }
+                        
+                        # 2. Generate PDF in memory
+                        pdf_bytes = generate_pdf_report(report_data)
+                        
+                        # 3. Add Download Button
+                        st.download_button(
+                            label="Download Forensic Report (PDF)",
+                            data=pdf_bytes,
+                            file_name=f"forensic_report_{os.path.basename(uploaded_file.name)}.pdf",
+                            mime="application/pdf"
+                        )
+                    except Exception as e:
+                        st.error(f"Could not generate PDF report: {e}")
+                        st.exception(e) # Show full error for debugging
 
             except Exception as e:
                 st.error(f"Prediction error: {e}")
@@ -489,163 +530,6 @@ if menu == "🚀 Predict Scanner":
                         pass
         else:
             st.info("Upload an image to see the analysis.")
-
-
-
-
-
-
-# # === PREDICT SCANNER PAGE ===
-# if menu == "🚀 Predict Scanner":
-#     st.header("Upload Image to Identify Scanner Source")
-
-#     # --- Collect available models dynamically ---
-#     available_model_types = []
-#     if BASELINE_AVAILABLE:
-#         available_model_types.append("Baseline (RF/SVM)")
-#     if FORENSICS_AVAILABLE:
-#         available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
-#     elif CNN_AVAILABLE:
-#         available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
-
-#     if not available_model_types:
-#         st.error("❌ No models loaded.")
-#         st.stop()
-
-#     # --- Stylish segmented model selector ---
-#     model_type = st.segmented_control(
-#         "Select Model Type",
-#         available_model_types,
-#         key="predict_model_type"
-#     )
-
-#     # --- Two-column layout ---
-#     col_input, col_results = st.columns(2)
-
-#     # ===============================================================
-#     # ============ LEFT COLUMN - IMAGE INPUT SECTION ================
-#     # ===============================================================
-#     with col_input:
-#         st.subheader("Your Image")
-#         with st.container(border=True):
-#             if model_type == "Baseline (RF/SVM)":
-#                 baseline_model_choice_str = st.selectbox(
-#                     "Algorithm", ["Random Forest", "SVM"], key="baseline_model_predict"
-#                 )
-#                 uploaded_file = st.file_uploader(
-#                     "Upload a scanned image", 
-#                     type=["tif", "tiff", "jpg", "png", "jpeg"], 
-#                     key="baseline_uploader"
-#                 )
-#             else:
-#                 uploaded_file = st.file_uploader(
-#                     "Upload a scanned image", 
-#                     type=["tif", "tiff", "jpg", "png", "jpeg"], 
-#                     key="cnn_uploader"
-#                 )
-
-#         if uploaded_file is not None:
-#             st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
-
-#     # ===============================================================
-#     # ============ RIGHT COLUMN - ANALYSIS RESULTS ==================
-#     # ===============================================================
-#     with col_results:
-#         st.subheader("Analysis Results")
-
-#         if uploaded_file is not None:
-#             # --- Create temp file ---
-#             with tempfile.NamedTemporaryFile(
-#                 delete=False, suffix=os.path.splitext(uploaded_file.name)[1]
-#             ) as tmp_file:
-#                 tmp_file.write(uploaded_file.getvalue())
-#                 temp_path = tmp_file.name
-
-#             try:
-#                 with st.spinner("Analyzing..."):
-
-#                     # ========== BASELINE MODEL ==========
-#                     if model_type == "Baseline (RF/SVM)" and BASELINE_AVAILABLE:
-#                         model_code = "rf" if baseline_model_choice_str == "Random Forest" else "svm"
-#                         pred_label, prob_list, classes = predict_scanner_baseline(
-#                             temp_path, model_choice=model_code
-#                         )
-
-#                         # --- Use Tabs for results ---
-#                         tab_scanner, _ = st.tabs(["Scanner Identification", "Tamper Detection"])
-
-#                         with tab_scanner:
-#                             st.metric("Predicted Scanner", pred_label)
-#                             if len(prob_list) == len(classes):
-#                                 prob_df = pd.DataFrame({
-#                                     'Class': classes,
-#                                     'Confidence': [p * 100 for p in prob_list]
-#                                 })
-#                                 st.bar_chart(
-#                                     prob_df.set_index('Class').sort_values('Confidence', ascending=False)
-#                                 )
-#                             else:
-#                                 st.warning("⚠️ Probability/Class mismatch.")
-
-#                     # ========== HYBRID FORENSICS ==========
-#                     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
-#                         s_label, s_conf, all_probs_dict = None, None, {}
-
-#                         # --- Scanner Prediction ---
-#                         if FORENSICS_AVAILABLE:
-#                             s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path)
-
-#                             # --- Tamper Detection ---
-#                             t_res = None
-#                             if HAS_IMG:
-#                                 t_res = infer_tamper_image(temp_path)
-#                                 tamper_source = "Image-Level (18D)"
-#                             elif HAS_PATCH:
-#                                 t_res = infer_tamper_single_patch(temp_path)
-#                                 tamper_source = "Patch Fallback (22D)"
-#                             else:
-#                                 tamper_source = "Disabled"
-#                         else:
-#                             pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path)
-#                             s_label, s_conf, all_probs_dict = pred_label_cnn, 0.0, {}
-#                             st.warning("Tamper check artifacts missing. Showing only Scanner ID.")
-
-#                         # --- Use Tabs for results ---
-#                         tab_scanner, tab_tamper = st.tabs(["Scanner Identification", "Tamper Detection"])
-
-#                         with tab_scanner:
-#                             st.metric("Predicted Scanner", s_label, f"{s_conf:.2f}% Confidence")
-#                             if all_probs_dict:
-#                                 prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
-#                                 prob_df['Confidence'] = prob_df['Probability'] * 100
-#                                 st.bar_chart(prob_df.set_index('Class').sort_values('Confidence', ascending=False))
-
-#                         with tab_tamper:
-#                             if FORENSICS_AVAILABLE and t_res:
-#                                 st.metric(
-#                                     "Tamper Label", 
-#                                     t_res["tamper_label"], 
-#                                     delta=f"{t_res['confidence']:.1f}% Confidence",
-#                                     delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
-#                                 )
-#                                 st.caption(f"Method: {tamper_source}")
-#                                 st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}** (Threshold: {t_res['threshold']:.3f})")
-#                                 if t_res['hits'] != -1:
-#                                     st.write(f"Patch Hits: **{t_res['hits']}**")
-#                             else:
-#                                 st.info("Tamper detection is only available with Hybrid Forensics model.")
-
-#             except Exception as e:
-#                 st.error(f"Prediction error: {e}")
-#             finally:
-#                 if os.path.exists(temp_path):
-#                     try:
-#                         os.remove(temp_path)
-#                     except OSError:
-#                         pass
-#         else:
-#             st.info("Upload an image to see the analysis.")
-
 
 
 
@@ -825,129 +709,6 @@ elif menu == "🛠️ Project Pipeline":
 
 
 
-# if menu == "Predict Scanner":
-#     st.header("Upload Image to Identify Scanner Source")
-#     available_model_types=[]
-#     if BASELINE_AVAILABLE: available_model_types.append("Baseline (RF/SVM)")
-#     # Update CNN label to reflect its new functionality
-#     if FORENSICS_AVAILABLE: 
-#         available_model_types.append("Hybrid Forensics (CNN + Tamper Check)")
-#     elif CNN_AVAILABLE: 
-#         available_model_types.append("CNN (Hybrid - 27 Feat) - No Tamper")
-
-#     if not available_model_types: st.error("❌ No models loaded."); st.stop()
-#     model_type=st.selectbox("Select Model Type", available_model_types, key="predict_model_type")
-
-
-#     # Baseline Prediction
-#     if model_type=="Baseline (RF/SVM)" and BASELINE_AVAILABLE:
-#         st.subheader("Baseline Prediction")
-#         baseline_model_choice_str=st.selectbox("Algorithm",["Random Forest","SVM"],key="baseline_model_predict")
-#         uploaded_file_base=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="baseline_uploader")
-#         if uploaded_file_base is not None:
-#             with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_base.name)[1]) as tmp_file_base:
-#                 tmp_file_base.write(uploaded_file_base.getvalue()); temp_path_baseline=tmp_file_base.name
-#             try:
-#                 st.image(uploaded_file_base, caption="Uploaded", width=256) # FIX: Use uploaded file
-#                 with st.spinner("Analyzing (Baseline)..."):
-#                     model_code="rf" if baseline_model_choice_str=="Random Forest" else "svm"
-#                     pred_label, prob_list, classes=predict_scanner_baseline(temp_path_baseline, model_choice=model_code)
-#                 if pred_label is not None and prob_list is not None and classes is not None and len(classes)>0:
-#                     st.success(f"🖼️ Prediction: **{pred_label}**")
-#                     st.write("Probabilities:")
-#                     if len(prob_list)==len(classes):
-#                         prob_df=pd.DataFrame({'Class':classes,'Probability':prob_list}); prob_df['Confidence (%)']=prob_df['Probability']*100
-#                         prob_df_display=prob_df[['Class','Confidence (%)']].copy(); prob_df_display['Confidence (%)']=prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-#                         st.dataframe(prob_df_display.sort_values(by='Confidence (%)',ascending=False,key=lambda x:x.str.rstrip('%').astype(float)))
-#                     else: st.warning("Prob/class mismatch.")
-#                 else: st.error("Baseline prediction failed.")
-#             except FileNotFoundError as e: st.error(f"Baseline artifacts missing: {e}")
-#             except Exception as e: st.error(f"Baseline prediction error: {e}")
-#             finally:
-#                 if 'temp_path_baseline' in locals() and os.path.exists(temp_path_baseline):
-#                     try: os.remove(temp_path_baseline)
-#                     except OSError: pass
-    
-    
-#     # CNN/Hybrid Forensics Prediction (Updated Block - FIX APPLIED)
-#     elif model_type.startswith("Hybrid Forensics") and (FORENSICS_AVAILABLE or CNN_AVAILABLE):
-#         # *** FIX: Wrap the entire block in st.container() to enforce rendering isolation ***
-#         with st.container():
-#             st.subheader("Hybrid Forensics Prediction (Scanner ID + Tamper Check)")
-#             uploaded_file_cnn=st.file_uploader("Upload Image",type=["tif","tiff","jpg","png","jpeg"],key="cnn_uploader")
-
-#             if uploaded_file_cnn is not None:
-#                 with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file_cnn.name)[1]) as tmp_file_cnn:
-#                     tmp_file_cnn.write(uploaded_file_cnn.getvalue()); temp_path_cnn=tmp_file_cnn.name
-
-#                 try:
-#                     st.image(uploaded_file_cnn, caption="Uploaded Image", use_container_width=True)
-
-#                     # Optional: Set debug flag for sidebar output
-#                     st.session_state['DEBUG_MODE'] = True # Can be a checkbox later
-
-#                     with st.spinner("Analyzing (Scanner ID & Tamper Check)..."):
-
-#                         # --- 1. Scanner Prediction (using the new module) ---
-#                         if FORENSICS_AVAILABLE:
-#                             s_label, s_conf, all_probs_dict = predict_scanner_hybrid_forensics(temp_path_cnn)
-
-#                             # --- 2. Tamper Detection ---
-#                             t_res = None
-#                             if HAS_IMG:
-#                                 t_res = infer_tamper_image(temp_path_cnn)
-#                                 tamper_source = "Image-Level (18D)"
-#                             elif HAS_PATCH:
-#                                 t_res = infer_tamper_single_patch(temp_path_cnn)
-#                                 tamper_source = "Patch Fallback (22D)"
-#                             else:
-#                                 tamper_source = "Disabled"
-
-#                         else: # Fallback to original predict_scanner_cnn if forensics failed but CNN is available
-#                             pred_label_cnn, prob_df_cnn, _ = predict_scanner_cnn(temp_path_cnn)
-#                             st.error("Tamper check artifacts missing. Showing only Scanner ID.")
-
-#                         # --- Display Results ---
-#                         c1, c2 = st.columns(2)
-
-#                         with c1:
-#                             st.markdown("### 🖼️ Scanner Identification")
-#                             st.success(f"Prediction: **{s_label}** ({s_conf:.2f}%)")
-
-#                             # Display all probabilities
-#                             if FORENSICS_AVAILABLE:
-#                                 prob_df = pd.DataFrame(list(all_probs_dict.items()), columns=['Class', 'Probability'])
-#                                 prob_df['Confidence (%)'] = prob_df['Probability'] * 100
-#                                 prob_df_display = prob_df[['Class', 'Confidence (%)']].copy()
-#                                 prob_df_display['Confidence (%)'] = prob_df_display['Confidence (%)'].map('{:.2f}%'.format)
-#                                 st.dataframe(prob_df_display.sort_values(by='Confidence (%)', ascending=False, key=lambda x:x.str.rstrip('%').astype(float)))
-
-#                         if t_res:
-#                             with c2:
-#                                 st.markdown("### 🚨 Tamper Detection")
-#                                 st.metric(
-#                                     "Tamper Label", 
-#                                     t_res["tamper_label"], 
-#                                     delta=f"{t_res['confidence']:.1f}% Confidence",
-#                                     delta_color=("inverse" if t_res['tamper_label'] == 'Tampered' else 'normal')
-#                                 )
-#                                 st.markdown(f"**Method:** _{tamper_source}_")
-#                                 st.write(f"Tampered Probability: **{t_res['prob_tampered']:.3f}**")
-#                                 st.write(f"Threshold: **{t_res['threshold']:.3f}**")
-#                                 if t_res['hits'] != -1:
-#                                     st.write(f"Patch Hits: **{t_res['hits']}**")
-
-#                 except Exception as e: 
-#                     st.error(f"Hybrid Forensics error: {e}")
-#                 finally:
-#                     if 'temp_path_cnn' in locals() and os.path.exists(temp_path_cnn):
-#                         try: os.remove(temp_path_cnn)
-#                         except OSError: pass
-
-
-
-
-
 # === DATASET VISUALIZATION PAGE ===
 elif menu == "🖼️ Dataset Visualization":
     st.header("📊 Dataset Visualization Dashboard")
@@ -1030,152 +791,6 @@ elif menu == "🖼️ Dataset Visualization":
                         )
                     except Exception as e:
                         st.error(f"Error generating noise map: {e}")
-
-
-
-
-
-
-# # elif menu == "📊 Dataset Visualization":
-# elif menu == "🖼️ Dataset Visualization":
-#     st.header("📊 Dataset Visualization Dashboard")
-#     st.write("View class distribution, random samples, and dataset statistics.")
-
-#     from scripts.visualize_data import get_image_data, get_dataset_summary
-#     import random
-#     from PIL import Image
-
-#     # === Cache the dataset scan ===
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_image_data(base_dir):
-#         return get_image_data(base_dir)
-
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_dataset_summary(base_dir):
-#         return get_dataset_summary(base_dir)
-
-#     DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
-
-#     if not os.path.exists(DATA_DIR):
-#         st.error(f"Dataset folder not found: {DATA_DIR}")
-#         st.stop()
-
-#     # Use cached function ✅
-#     with st.spinner("Analyzing dataset..."):
-#         df, class_counts, stats = cached_get_dataset_summary(DATA_DIR)
-
-#     if df is None:
-#         st.warning("No images found in dataset.")
-#         st.stop()
-
-#     # --- Summary Stats ---
-#     st.subheader("📦 Dataset Summary")
-#     c1, c2, c3, c4 = st.columns(4)
-#     c1.metric("Total Classes", stats["total_classes"])
-#     c2.metric("Total Images", stats["total_images"])
-#     c3.metric("Avg. Resolution", stats["avg_resolution"])
-#     c4.metric("Most Common Format", stats["common_format"])
-
-#     # --- Class Distribution ---
-#     st.subheader("📈 Class Distribution")
-#     st.bar_chart(class_counts.set_index("Class")["Image Count"])  # ✅ Native, interactive bar chart
-
-#     # --- Random Samples ---
-#     st.subheader("🖼️ Sample Images from Each Class")
-#     for class_name in class_counts["Class"]:
-#         subset = df[df["Class"] == class_name]
-#         if subset.empty:
-#             continue
-
-#         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
-
-#         # ✅ Use expander for cleaner UI
-#         with st.expander(f"📁 {class_name} ({len(subset)} images)"):
-#             cols = st.columns(len(sample_paths))
-#             for i, img_path in enumerate(sample_paths):
-#                 try:
-#                     img = Image.open(img_path)
-#                     cols[i].image(img, use_container_width=True)
-#                 except Exception as e:
-#                     st.error(f"Error loading image: {e}")
-#                     continue
-
-
-
-
-
-
-# elif menu == "📊 Dataset Visualization":
-#     st.header("📊 Dataset Visualization Dashboard")
-#     st.write("View class distribution, random samples, and dataset statistics.")
-
-#     from scripts.visualize_data import get_image_data, get_dataset_summary
-
-#     # === Cache the dataset scan ===
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_image_data(base_dir):
-#         return get_image_data(base_dir)
-
-#     @st.cache_data(show_spinner=False)
-#     def cached_get_dataset_summary(base_dir):
-#         return get_dataset_summary(base_dir)
-
-#     DATA_DIR = os.path.join(PROJECT_ROOT, "data", "Official")
-
-#     if not os.path.exists(DATA_DIR):
-#         st.error(f"Dataset folder not found: {DATA_DIR}")
-#         st.stop()
-
-#     # Use cached function ✅
-#     with st.spinner("Analyzing dataset..."):
-#         df, class_counts, stats = cached_get_dataset_summary(DATA_DIR)
-
-#     if df is None:
-#         st.warning("No images found in dataset.")
-#         st.stop()
-
-#     # --- Summary Stats ---
-#     st.subheader("📦 Dataset Summary")
-#     c1, c2, c3, c4 = st.columns(4)
-#     c1.metric("Total Classes", stats["total_classes"])
-#     c2.metric("Total Images", stats["total_images"])
-#     c3.metric("Avg. Resolution", stats["avg_resolution"])
-#     c4.metric("Most Common Format", stats["common_format"])
-
-#     # --- Class Distribution ---
-#     st.subheader("📈 Class Distribution")
-#     fig, ax = plt.subplots(figsize=(10, 6))
-#     sns.barplot(
-#         x="Class",
-#         y="Image Count",
-#         data=class_counts,
-#         hue="Class",
-#         dodge=False,
-#         legend=False,
-#         palette="viridis"
-#     )
-#     plt.xticks(rotation=90)
-#     st.pyplot(fig)
-#     plt.close(fig)
-
-#     # --- Random Samples ---
-#     st.subheader("🖼️ Sample Images from Each Class")
-#     import random
-#     from PIL import Image
-
-#     for class_name in class_counts["Class"]:
-#         subset = df[df["Class"] == class_name]
-#         if subset.empty:
-#             continue
-#         sample_paths = random.sample(subset["Path"].tolist(), min(3, len(subset)))
-#         st.markdown(f"### 📁 {class_name} ({len(subset)} images)")
-#         cols = st.columns(len(sample_paths))
-#         for i, img_path in enumerate(sample_paths):
-#             try:
-#                 img = Image.open(img_path)
-#                 cols[i].image(img, use_container_width=True)
-#             except:
-#                 continue
 
 
 
