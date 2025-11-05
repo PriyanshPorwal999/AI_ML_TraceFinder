@@ -126,6 +126,66 @@ Your app should now be available at 👉 http://localhost:8501
 
 - View confidence score and residual noise visualization (scanner fingerprint).
 
+
+### 📂 Project Structure 
+AI_ML_TraceFinder/
+│
+├── .gitignore
+├── LICENSE
+├── README.md
+├── requirements.txt
+├── regenerate_scaler.py
+│
+├── img/ # App screenshots & logo
+│ ├── Data Visualization Page.png
+│ ├── Feature Extraction App.png
+│ ├── Main Prediction App.png
+│ └── Model Evaluation Page.png
+│
+├── archive/ # Archived dataset & legacy files
+│ ├── FeatureExtractor/
+│ │ └── feature_extractor.py
+│ ├── FeatureOutputs/
+│ │ └── image_features.csv
+│ └── dataset/ # Scanner image samples (Canon, Nikon, Sony)
+│
+├── src/
+│ ├── app/
+│ │ └── Main_app.py # Streamlit main app
+│ │
+│ ├── features/
+│ │ ├── baseline/ # Classical ML feature extraction
+│ │ │ ├── build_features.py
+│ │ │ ├── extractor_backend.py
+│ │ │ └── extractor_frontend.py
+│ │ └── cnn/ # CNN-based feature extraction
+│ │ ├── config.py
+│ │ ├── feature_app.py
+│ │ ├── feature_extractor_cnn.py
+│ │ └── feature_extractor_functions.py
+│ │
+│ ├── models/
+│ │ ├── baseline/
+│ │ │ └── models/ # Saved ML models (SVM, RF, scalers)
+│ │ └── cnn/
+│ │ └── models/ # Trained CNN models (.keras)
+│ │
+│ ├── preprocess/
+│ │ ├── baseline/ # Preprocessing for ML models
+│ │ └── cnn/ # Preprocessing for CNN models
+│ │
+│ └── scripts/ # Training, evaluation & explainability
+│ ├── train_hybrid_cnn.py
+│ ├── eval_hybrid_cnn.py
+│ ├── explainability.py
+│ ├── predict_forensics.py
+│ ├── training_baseline.py
+│ ├── reporting.py
+│ └── visualize_data.py
+│
+├── hybrid_feat_scaler.pkl # Scaler used for hybrid feature normalization
+└── img/logo.png
+
 ### 🤝 Contributing
 
 Contributions are welcome!
