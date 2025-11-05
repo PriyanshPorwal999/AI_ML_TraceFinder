@@ -128,6 +128,7 @@ Your app should now be available at 👉 http://localhost:8501
 
 
 ### 📂 Project Structure 
+```bash
 AI_ML_TraceFinder/
 │
 ├── .gitignore
@@ -185,7 +186,8 @@ AI_ML_TraceFinder/
 │
 ├── hybrid_feat_scaler.pkl # Scaler used for hybrid feature normalization
 └── img/logo.png
-
+```
+--- 
 ### 🤝 Contributing
 
 Contributions are welcome!
